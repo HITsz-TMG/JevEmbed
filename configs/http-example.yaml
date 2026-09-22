@@ -1,0 +1,19 @@
+model_id: embedding-service
+backend: http
+model_name_or_path: your-serving-model-id
+base_url: http://127.0.0.1:8001/v1
+# api_key_env: EMBEDDING_API_KEY
+batch_size: 16
+timeout: 60.0
+max_retries: 2
+template_owner: client
+# Only enable after configuring the service to reject overlong inputs.
+server_enforces_length: true
+overflow_policy: error
+usage_mode: strict
+prompts:
+  query_template: "Instruct: {instruction}\nQuery: {text}"
+  document_template: "{text}"
+scoring:
+  choice_temperature: 0.5
+  score_temperature: 0.5

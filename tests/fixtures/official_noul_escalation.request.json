@@ -1,0 +1,18 @@
+{
+  "model": "jev-latest",
+  "state": "I have asked three times now. Can I please just talk to a real person?",
+  "questions": {
+    "is_human_escalation": {
+      "type": "noul",
+      "instructions": "Is the customer asking for a human agent?"
+    },
+    "is_repeat_contact": {
+      "type": "noul",
+      "instructions": "Has the customer contacted support about this before?",
+      "criteria": {
+        "true": "Mentions a prior attempt, ticket, or that they have asked before",
+        "false": "No sign of any previous contact"
+      }
+    }
+  }
+}

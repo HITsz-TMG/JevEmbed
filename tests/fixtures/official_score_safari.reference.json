@@ -1,0 +1,24 @@
+{
+  "model": "jev-1.13.0",
+  "answers": {
+    "bug_severity": {
+      "type": "score",
+      "score": 1.43,
+      "confidence": 0.35,
+      "legend": {
+        "0": "Cosmetic; no impact to functionality",
+        "1": "Broken or degraded feature, but workaround exists",
+        "2": "Blocking issue; no workaround exists"
+      },
+      "probabilities": {
+        "0": 0.0,
+        "1": 0.57,
+        "2": 0.43
+      }
+    }
+  },
+  "usage": {
+    "input_tokens": 332,
+    "output_tokens": 18
+  }
+}

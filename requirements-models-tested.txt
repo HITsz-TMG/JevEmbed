@@ -1,0 +1,7 @@
+# Validated model stack for KaLM, Qwen3 (0.6B/4B) and multilingual E5.
+# Use with pip -c. GPU builds such as torch 2.8.0+cu129 satisfy torch==2.8.0.
+transformers==4.51.0
+sentence-transformers==5.3.0
+torch==2.8.0
+numpy==1.26.4
+PyYAML==6.0.3

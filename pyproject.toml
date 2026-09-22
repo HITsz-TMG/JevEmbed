@@ -1,0 +1,27 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "jevembed"
+version = "0.1.0"
+description = "Instruction embedding implementation of Jev-shaped decisions"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = ["PyYAML>=6,<7"]
+
+[project.optional-dependencies]
+local = ["numpy>=1.26,<2", "torch>=2.1,<3", "transformers==4.51.0", "sentence-transformers==5.3.0"]
+http = ["httpx>=0.27,<1"]
+server = ["fastapi>=0.115,<1", "uvicorn>=0.30,<1"]
+test = ["pytest>=8,<10", "httpx>=0.27,<1", "fastapi>=0.115,<1"]
+
+[project.scripts]
+jevembed = "jevembed.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]

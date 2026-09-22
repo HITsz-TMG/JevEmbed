@@ -1,0 +1,15 @@
+{
+  "model": "jev-latest",
+  "state": "The export button crashes the settings page in Safari. It works in Chrome, but a few of our customers only use Safari.",
+  "questions": {
+    "bug_severity": {
+      "type": "score",
+      "instructions": "How severe is the reported issue?",
+      "criteria": [
+        "Cosmetic; no impact to functionality",
+        "Broken or degraded feature, but workaround exists",
+        "Blocking issue; no workaround exists"
+      ]
+    }
+  }
+}

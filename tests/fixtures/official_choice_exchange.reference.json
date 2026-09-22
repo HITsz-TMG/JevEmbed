@@ -1,0 +1,19 @@
+{
+  "model": "jev-1.13.0",
+  "answers": {
+    "department": {
+      "type": "choice",
+      "choice": "returns",
+      "confidence": 1.0,
+      "probabilities": {
+        "shipping": 0.0,
+        "returns": 1.0,
+        "billing": 0.0
+      }
+    }
+  },
+  "usage": {
+    "input_tokens": 328,
+    "output_tokens": 34
+  }
+}

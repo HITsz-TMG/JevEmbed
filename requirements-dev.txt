@@ -1,0 +1,3 @@
+# Lightweight development/test dependencies; no model download or torch required.
+-e .[test]
+build>=1.2,<2

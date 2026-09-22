@@ -1,0 +1,15 @@
+{
+  "model": "kalm-embedding-v2.5",
+  "state": "My running shoes arrived in the wrong size. Can I swap them for a size 10?",
+  "questions": {
+    "department": {
+      "type": "choice",
+      "instructions": "Which team should handle this?",
+      "criteria": {
+        "returns": "Exchanges, wrong or damaged items",
+        "shipping": "Delivery status, delays, lost packages",
+        "billing": "Charges, invoices, payment problems"
+      }
+    }
+  }
+}

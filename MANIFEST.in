@@ -1,0 +1,12 @@
+include README.md
+include requirements*.txt
+recursive-include configs *.yaml
+recursive-include examples *.json *.md
+recursive-include docs *.md
+recursive-include reports *.md *.json
+recursive-include scripts *.py *.sh
+recursive-include tests *.py *.json *.jsonl
+prune configs/local
+prune artifacts
+prune models
+global-exclude *.local.yaml *.local.yml *.py[cod] *.log *.xml
