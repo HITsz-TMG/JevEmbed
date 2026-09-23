@@ -32,7 +32,7 @@ The model must be registered. HTTP requires an explicit model; Python calls may 
 
 | Primitive | Criteria |
 | --- | --- |
-| Choice | Mapping of 1–255 names to strings, objects, arrays, or null |
+| Choice | Nonempty mapping of names to strings, objects, arrays, or null; no fixed candidate count limit |
 | Score | Ordered array of 2–10 strings, objects, or arrays |
 | Noul | Omitted, or a complete mapping with `true` and `false` descriptions |
 
@@ -227,7 +227,7 @@ Core dependencies remain lightweight. Local inference, HTTP clients, and servers
 
 Validation separates contract correctness, model integration, and semantic observations. Fixed vectors can verify formulas and fields but cannot establish model decision quality.
 
-Automated checks cover exact input mappings; both Noul paths; unchanged instructions and question-ID independence; null and structured criteria; candidate bounds and ties; Score indices and legends; mixed-question independence; stable probability formulas; finite parameters and vectors; Unicode; length policies; model aliases; cache isolation; concurrency and usage; HTTP response indices, retries, and errors; matching Python and HTTP fields; lazy imports; and CLI operation.
+Automated checks cover exact input mappings; both Noul paths; unchanged instructions and question-ID independence; null and structured criteria; nonempty Choice criteria, large candidate sets, and ties; Score indices and legends; mixed-question independence; stable probability formulas; finite parameters and vectors; Unicode; length policies; model aliases; cache isolation; concurrency and usage; HTTP response indices, retries, and errors; matching Python and HTTP fields; lazy imports; and CLI operation.
 
 Real-model validation records revisions or explicit unknown status, artifact hashes, templates, scoring settings, raw cosine values, outputs, device, precision, dependencies, timing, and usage provenance. Single-question and mixed-question Noul runs are compared with an explicit tolerance. Length validation must prove acceptance at the limit, rejection above it, and reported truncation when enabled.
 

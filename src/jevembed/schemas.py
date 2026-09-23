@@ -26,8 +26,8 @@ def validate_request(request, default_model=None):
         _content(q.get("instructions"), f"questions.{qid}.instructions")
         kind, criteria = q.get("type"), q.get("criteria")
         if kind == "choice":
-            if not isinstance(criteria, dict) or not 1 <= len(criteria) <= 255:
-                raise ValidationError(f"{qid}: Choice requires 1..255 candidates")
+            if not isinstance(criteria, dict) or not criteria:
+                raise ValidationError(f"{qid}: Choice requires at least one candidate")
             for value in criteria.values():
                 if value is not None:
                     _content(value, f"{qid}.criteria")

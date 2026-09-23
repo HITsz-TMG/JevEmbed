@@ -76,10 +76,10 @@ def test_choice_reorder_and_tie():
     assert a2["choice"] == "a" and a2["probabilities"] == a["probabilities"]
 
 
-def test_choice_limit(client):
-    assert len(client.evaluate(request(criteria={str(i): None for i in range(255)}))["answers"]["q"]["probabilities"]) == 255
+def test_choice_requires_candidates_without_fixed_upper_bound(client):
+    assert len(client.evaluate(request(criteria={str(i): None for i in range(1024)}))["answers"]["q"]["probabilities"]) == 1024
     with pytest.raises(ValidationError):
-        client.evaluate(request(criteria={str(i): None for i in range(256)}))
+        client.evaluate(request(criteria={}))
 
 
 def test_score_expectation_and_legend(client):
