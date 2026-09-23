@@ -546,7 +546,7 @@ JevEmbed uses [Sentence Transformers](https://www.sbert.net/) for model loading 
 
 ## Citation
 
-If you use KaLM embeddings in your research, please cite the following papers:
+If you find JevEmbed useful, please consider citing the following papers:
 
 ```bibtex
 @misc{zhao2025kalmembeddingv2,
