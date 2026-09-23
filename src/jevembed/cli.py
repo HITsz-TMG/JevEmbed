@@ -18,6 +18,14 @@ def main(argv=None):
     parser.add_argument("--serve", action="store_true")
     parser.add_argument("--host", default="127.0.0.1")
     parser.add_argument("--port", type=int, default=8000)
+    parser.add_argument("--max-request-bytes", type=int, default=2 * 1024 * 1024,
+                        help="Maximum HTTP JSON body size (default: 2097152)")
+    parser.add_argument("--max-questions", type=int, default=64,
+                        help="Maximum questions per HTTP request (default: 64)")
+    parser.add_argument("--max-embedding-inputs", type=int, default=4096,
+                        help="Maximum compiled embedding inputs per HTTP request (default: 4096)")
+    parser.add_argument("--max-concurrent-requests", type=int, default=4,
+                        help="Maximum active HTTP inference requests per process (default: 4)")
     args = parser.parse_args(argv)
     try:
         client = JevEmbed()
@@ -25,8 +33,12 @@ def main(argv=None):
             client.register(ModelConfig.load(path))
         if args.serve:
             import uvicorn
-            from .server import create_app
-            uvicorn.run(create_app(client), host=args.host, port=args.port)
+            from .server import HTTPServiceLimits, create_app
+            limits = HTTPServiceLimits(max_body_bytes=args.max_request_bytes,
+                                       max_questions=args.max_questions,
+                                       max_embedding_inputs=args.max_embedding_inputs,
+                                       max_concurrent_requests=args.max_concurrent_requests)
+            uvicorn.run(create_app(client, limits=limits), host=args.host, port=args.port)
             return 0
         request = json.loads(sys.stdin.read() if args.input == "-" else Path(args.input).read_text(encoding="utf-8"))
         result = client.explain(request) if args.explain else (

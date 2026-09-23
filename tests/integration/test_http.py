@@ -11,7 +11,7 @@ from fastapi.testclient import TestClient
 from conftest import request
 from jevembed import JevEmbed, ModelConfig, BackendError, ValidationError
 from jevembed.backends import HTTPEmbeddingBackend, EmbeddingInput
-from jevembed.server import create_app
+from jevembed.server import HTTPServiceLimits, create_app
 
 
 def http_config(**kwargs):
@@ -90,6 +90,22 @@ def test_http_usage_modes_concurrent():
     assert batch.input_tokens == 2 and "estimated" in batch.usage_source
 
 
+def test_same_model_http_requests_encode_concurrently():
+    barrier = threading.Barrier(2)
+
+    def handler(r):
+        barrier.wait(timeout=5)
+        count = len(json.loads(r.content)["input"])
+        return httpx.Response(200, json={"data": [{"index": i, "embedding": [1, 0]} for i in range(count)],
+                                         "usage": {"prompt_tokens": count}})
+
+    cfg = http_config(cache_capacity=0)
+    client = JevEmbed(config=cfg, backend=HTTPEmbeddingBackend(cfg, transport=httpx.MockTransport(handler)))
+    with ThreadPoolExecutor(2) as pool:
+        results = list(pool.map(client.evaluate, [{**request(), "state": state} for state in ("one", "two")]))
+    assert all(result["answers"]["q"]["type"] == "choice" for result in results)
+
+
 def test_http_requires_explicit_length_and_prompt_contract():
     with pytest.raises(ValidationError):
         HTTPEmbeddingBackend(ModelConfig(backend="http"))
@@ -122,6 +138,60 @@ def test_server_backend_failure(client, backend):
     backend.encode = broken
     response = TestClient(create_app(client)).post("/v1/systemone", json={**request(), "model": "test"})
     assert response.status_code == 502 and "answers" not in response.json()
+
+
+def test_server_limits_work_without_limiting_python_api(client):
+    large = {**request(), "model": "test"}
+    large["questions"]["q"]["criteria"] = {str(i): f"candidate {i}" for i in range(300)}
+    assert len(client.evaluate(large)["answers"]["q"]["probabilities"]) == 300
+
+    app = TestClient(create_app(client, limits=HTTPServiceLimits(max_embedding_inputs=301)))
+    assert app.post("/v1/systemone", json=large).status_code == 200
+    app = TestClient(create_app(client, limits=HTTPServiceLimits(max_embedding_inputs=300)))
+    response = app.post("/v1/systemone", json=large)
+    assert response.status_code == 413 and "embedding inputs" in response.json()["detail"]
+
+    app = TestClient(create_app(client, limits=HTTPServiceLimits(max_questions=1)))
+    doubled = {**large, "questions": {"q": large["questions"]["q"], "q2": large["questions"]["q"]}}
+    assert app.post("/v1/systemone", json=doubled).status_code == 413
+
+
+def test_server_rejects_oversized_body_even_if_content_length_is_small(client):
+    app = TestClient(create_app(client, limits=HTTPServiceLimits(max_body_bytes=100)))
+    large = json.dumps({**request(), "model": "test", "state": "x" * 200}).encode()
+    assert app.post("/v1/systemone", content=large).status_code == 413
+    assert app.post("/v1/systemone", content=large, headers={"Content-Length": "1"}).status_code == 413
+
+
+def test_server_rejects_requests_when_inference_slots_are_busy():
+    from conftest import FixedBackend
+
+    started, release = threading.Event(), threading.Event()
+
+    class BlockingBackend(FixedBackend):
+        def encode(self, items):
+            started.set()
+            assert release.wait(5)
+            return super().encode(items)
+
+    client = JevEmbed(backend=BlockingBackend(), model="test")
+    app = TestClient(create_app(client, limits=HTTPServiceLimits(max_concurrent_requests=1)))
+    body = {**request(), "model": "test"}
+    with ThreadPoolExecutor(2) as pool:
+        first = pool.submit(app.post, "/v1/systemone", json=body)
+        try:
+            assert started.wait(5)
+            busy = app.post("/v1/systemone", json=body)
+            assert busy.status_code == 429 and busy.headers["Retry-After"] == "1"
+        finally:
+            release.set()
+        assert first.result().status_code == 200
+
+
+@pytest.mark.parametrize("value", [0, -1, True, 1.5, "4"])
+def test_server_limit_values_must_be_positive_integers(value):
+    with pytest.raises(ValueError):
+        HTTPServiceLimits(max_concurrent_requests=value)
 
 
 def test_local_embedding_server_over_tcp():

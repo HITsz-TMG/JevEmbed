@@ -3,12 +3,14 @@ from copy import deepcopy
 from dataclasses import replace
 import json
 import math
+import threading
 
 import pytest
 
 from conftest import FixedBackend, ROOT, request
 from jevembed import JevEmbed, ModelConfig, PromptConfig, ScoringConfig, LogisticConfig, ValidationError, BackendError
 from jevembed.backends import EmbeddingBatch
+from jevembed.backends.sentence_transformers import SentenceTransformersBackend
 from jevembed.scoring import normalize_vectors, normalized_entropy, sigmoid, softmax
 from jevembed.serialization import serialize
 
@@ -42,6 +44,14 @@ def test_official_reference():
 def test_explain_never_encodes(client, backend):
     client.explain(request())
     assert backend.calls == []
+
+
+def test_evaluate_does_not_build_diagnostic_trace(client, monkeypatch):
+    def unexpected_trace(*args):
+        raise AssertionError("Normal inference should not build a diagnostic trace")
+
+    monkeypatch.setattr(client, "_explain", unexpected_trace)
+    assert client.evaluate(request())["answers"]["q"]["type"] == "choice"
 
 
 def test_question_id_and_unrelated_question_independence(client, backend):
@@ -227,6 +237,29 @@ def test_cache_usage_capacity_clear_and_concurrency(client, backend):
     tiny = JevEmbed(config=ModelConfig(model_id="tiny", backend="custom", cache_capacity=1), backend=FixedBackend())
     tiny.evaluate(r)
     assert tiny.evaluate(r)["usage"]["input_tokens"] == 14
+
+
+def test_local_model_requests_can_score_concurrently():
+    class StubLocal(SentenceTransformersBackend):
+        def prepare(self):
+            return {}
+
+        def encode(self, items):
+            with self._lock:
+                return EmbeddingBatch([[1, 0] for _ in items], len(items), "stub")
+
+    barrier = threading.Barrier(2)
+
+    def confidence(probabilities):
+        barrier.wait(timeout=5)
+        return 0.5
+
+    cfg = ModelConfig(model_id="local", backend="sentence_transformers", model_name_or_path="unused",
+                      cache_capacity=0)
+    client = JevEmbed(config=cfg, backend=StubLocal(config=cfg), confidence_estimator=confidence)
+    with ThreadPoolExecutor(2) as pool:
+        results = list(pool.map(client.evaluate, [{**request(), "state": state} for state in ("one", "two")]))
+    assert all(result["answers"]["q"]["confidence"] == 0.5 for result in results)
 
 
 def test_alias_model_and_config_isolation():

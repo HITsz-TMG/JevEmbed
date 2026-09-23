@@ -1,4 +1,5 @@
 from dataclasses import asdict, dataclass, field, replace
+from contextlib import nullcontext
 import logging
 import hashlib
 import json
@@ -24,6 +25,7 @@ class _Model:
     cache: EmbeddingCache
     lock: object = field(default_factory=threading.RLock)
     dimension: int | None = None
+    cache_generation: int = 0
 
 
 class JevEmbed:
@@ -83,7 +85,7 @@ class JevEmbed:
         return self._explain(*self._prepare(request))
 
     def evaluate(self, request):
-        return self.evaluate_with_trace(request)["response"]
+        return self._evaluate(request, include_trace=False)
 
     def system_one(self, *, state, questions, model=None):
         request = {"state": state, "questions": questions}
@@ -96,8 +98,12 @@ class JevEmbed:
         for entry in entries:
             with entry.lock:
                 entry.cache.clear()
+                entry.cache_generation += 1
 
     def evaluate_with_trace(self, request):
+        return self._evaluate(request, include_trace=True)
+
+    def _evaluate(self, request, *, include_trace):
         started = time.perf_counter()
         entry, plans = self._prepare(request)
         cfg = entry.config
@@ -105,20 +111,26 @@ class JevEmbed:
         vectors, sources, batches = {}, [], []
         truncations = {}
         usage, hits = 0, 0
-        with entry.lock:
+        # Built-in backends protect their own mutable state. Local encode calls
+        # serialize inside SentenceTransformersBackend; HTTP calls may overlap.
+        # Unknown custom backends retain whole-request serialization.
+        built_in = isinstance(entry.backend, (HTTPEmbeddingBackend, SentenceTransformersBackend))
+        with (nullcontext() if built_in else entry.lock):
             provenance = entry.backend.prepare() if hasattr(entry.backend, "prepare") else {}
             identity = hashlib.sha256(json.dumps(provenance, sort_keys=True).encode()).hexdigest()
             prefix = (cfg.fingerprint(), SERIALIZATION_VERSION, identity)
             missing = []
-            for item in unique:
-                cached = entry.cache.get((prefix, item))
-                if cached is None:
-                    missing.append(item)
-                else:
-                    vectors[item] = cached["vector"]
-                    if cached["truncation"]:
-                        truncations[item] = cached["truncation"]
-                    hits += 1
+            with entry.lock:
+                cache_generation = entry.cache_generation
+                for item in unique:
+                    cached = entry.cache.get((prefix, item))
+                    if cached is None:
+                        missing.append(item)
+                    else:
+                        vectors[item] = cached["vector"]
+                        if cached["truncation"]:
+                            truncations[item] = cached["truncation"]
+                        hits += 1
             # Cache writes are committed only after the entire request has succeeded.
             for start in range(0, len(missing), cfg.batch_size):
                 items = missing[start:start+cfg.batch_size]
@@ -128,9 +140,10 @@ class JevEmbed:
                     raise
                 except Exception as exc:
                     raise BackendError(f"Backend encode failed: {exc}") from exc
-                normalized = normalize_vectors(batch.vectors, len(items), entry.dimension or cfg.expected_dimension)
-                if normalized:
-                    entry.dimension = len(normalized[0])
+                with entry.lock:
+                    normalized = normalize_vectors(batch.vectors, len(items), entry.dimension or cfg.expected_dimension)
+                    if normalized:
+                        entry.dimension = len(normalized[0])
                 token_count = batch.input_tokens
                 source = batch.usage_source
                 if token_count is None:
@@ -143,19 +156,28 @@ class JevEmbed:
                 if type(token_count) is not int or token_count < 0:
                     raise BackendError("Backend input_tokens must be a nonnegative integer")
                 usage += token_count
-                sources.append(source)
-                batches.append({"inputs": [asdict(item) for item in items], "metadata": batch.metadata})
+                if include_trace:
+                    sources.append(source)
+                    batches.append({"inputs": [asdict(item) for item in items], "metadata": batch.metadata})
                 for record in batch.metadata.get("truncated", []):
                     truncations[items[record["index"]]] = {k: v for k, v in record.items() if k != "index"}
                 vectors.update(zip(items, normalized))
             answers, diagnostics = {}, {}
             for plan in plans:
-                answers[plan.question_id], diagnostics[plan.question_id] = score_plan(
+                answer, diagnostic = score_plan(
                     plan, [vectors[item] for item in plan.inputs], cfg.scoring, self.confidence_estimator)
-            for item in missing:
-                entry.cache.put((prefix, item), {"vector": vectors[item], "truncation": truncations.get(item)})
+                answers[plan.question_id] = answer
+                if include_trace:
+                    diagnostics[plan.question_id] = diagnostic
+            with entry.lock:
+                # A concurrent clear_cache() must not be undone by an in-flight request.
+                if entry.cache_generation == cache_generation:
+                    for item in missing:
+                        entry.cache.put((prefix, item), {"vector": vectors[item], "truncation": truncations.get(item)})
         response = {"model": cfg.model_id, "answers": answers,
                     "usage": {"input_tokens": usage, "output_tokens": 0}}
+        if not include_trace:
+            return response
         trace = self._explain(entry, plans)
         trace.update(questions=diagnostics, cache_hits=hits, encoded_inputs=len(missing),
                      usage_sources=sorted(set(sources)) or ["cache"], batches=batches,

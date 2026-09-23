@@ -12,6 +12,7 @@ JevEmbed v0.1 implements Jev-shaped JSON contracts. The original implementation 
 | Noul | Only `type` and `noul`; shipped models encode all inputs under a fixed retrieval instruction, using a similarity difference with criteria or one similarity without criteria; legacy and fixed yes/no mappings remain optional |
 | Model selection | Explicit registration and aliases; canonical response ID; no silent fallback |
 | HTTP model field | Required; Python calls may use the default model |
+| HTTP resource limits | Configurable body, question, embedding-input, and active-request caps; 413 for size/work violations and 429 when busy; Python calls are unaffected |
 | Validation | Unknown fields, empty questions, invalid JSON, NaN/Infinity, and ambiguous criteria return 422 |
 | Backend failures | HTTP 502; the entire request fails without partial answers |
 | Confidence | Normalized entropy, not the official formula or prediction accuracy |

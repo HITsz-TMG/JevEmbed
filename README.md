@@ -464,6 +464,8 @@ python -m jevembed --config configs/kalm-embedding-v2.5.yaml --serve
 
 The server binds to `127.0.0.1:8000` by default and provides `POST /v1/systemone` and `GET /v1/models`. HTTP requests require `model`. Validation errors return 422; backend failures return 502, without partial answers. `create_app(client, enable_debug=True)` additionally enables `/debug/explain`.
 
+By default, each server process accepts at most 2 MiB per request, 64 questions, 4096 compiled embedding inputs, and four active inference requests. Requests exceeding a size or work limit return 413; excess concurrent requests return 429. Configure these with `--max-request-bytes`, `--max-questions`, `--max-embedding-inputs`, and `--max-concurrent-requests`. The limits apply only to the HTTP service; the Python API has no fixed Choice candidate cap. See [HTTP serving limits](docs/runtime.md#http-serving-limits) for programmatic configuration and concurrency behavior.
+
 Use [http-example.yaml](configs/http-example.yaml) to connect to an embeddings service. Templates are rendered by the client; the service should not add prompts again. Configure the service to reject overlong inputs before declaring `server_enforces_length: true`. The generic adapter does not support server-owned templates or client-side truncation. It restores vector order from response indices and rejects missing or duplicate indices. Retries are bounded and limited to transient failures. API keys are read from the configured environment variable.
 
 ## LoRA fine-tuning
