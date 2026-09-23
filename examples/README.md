@@ -10,7 +10,7 @@ These examples are organized by task and shared by all supported models.
 
 The JSON files default to `model: kalm-embedding-v2.5`. To switch models, change only `model` and load the corresponding configuration. Keep state, instructions, and criteria unchanged.
 
-With the shipped models' retrieval Noul format, Choice/Score temperature 0.1, and Noul slope 10/intercept 0, the unadapted models returned the following values on the three requests. These are CPU FP32 inference results with caching disabled, rounded to six decimals. They are example predictions, not accuracy measurements or calibrated probabilities.
+With the shipped models' retrieval Noul format, Choice/Score temperature 0.1, and Noul slope 10/intercept 0, four previously evaluated models returned the following values on the three requests. These are CPU FP32 inference results with caching disabled, rounded to six decimals. They are example predictions, not accuracy measurements or calibrated probabilities. Qwen3 8B is supported but has not been run for this CPU FP32 comparison.
 
 | Model | Choice: `returns` probability | Score: expected severity | Noul: human escalation | Noul: repeat contact |
 | --- | ---: | ---: | ---: | ---: |

@@ -55,11 +55,14 @@ The provided configurations use Hugging Face repository IDs. Weights are downloa
 | `kalm-embedding-v2.5` | `KaLM-Embedding/KaLM-embedding-multilingual-mini-instruct-v2.5` | 896 | 32768 | Mean |
 | `qwen3-embedding-0.6b` | `Qwen/Qwen3-Embedding-0.6B` | 1024 | 32768 | Last-token |
 | `qwen3-embedding-4b` | `Qwen/Qwen3-Embedding-4B` | 2560 | 32768 | Last-token |
+| `qwen3-embedding-8b` | `Qwen/Qwen3-Embedding-8B` | 4096 | 32768 | Last-token |
 | `multilingual-e5-large-instruct` | `intfloat/multilingual-e5-large-instruct` | 1024 | 512 | Mean |
 
 Configurations are stored in `configs/<model-id>.yaml`. Each full repository ID is registered as an alias, while responses use the canonical short ID. Unknown model IDs are rejected. `jev-latest` is not registered automatically.
 
 KaLM explicitly enables `trust_remote_code: true` to load its repository-provided Python implementation. Qwen3 and E5 use `false`. A loading failure never enables trust or changes pooling automatically. Pin a revision and preserve dependency and template versions when reproducing results.
+
+Qwen3-Embedding-8B was verified with Choice, Score, and Noul example requests on CUDA BF16 using the tested dependency versions. Its public-subset JevBench result is included below.
 
 ## Quick start
 
@@ -128,7 +131,7 @@ Small numerical differences can occur with different hardware, precision, or mod
 
 Reference outputs are taken from the saved Jev documentation examples, rather than new API calls. Both columns contain model predictions, not independently annotated ground truth. These examples illustrate API behavior and do not constitute an accuracy benchmark.
 
-The same requests were also run with the other three supported models; see the [four-model example results](examples/README.md).
+The same requests were also run on three other models; see the [four-model CPU example results](examples/README.md).
 
 ### Choice: route an exchange request
 
@@ -530,15 +533,16 @@ These runs use the current configurations: Choice/Score temperature **0.1**, Nou
 
 | Model | Easy (48) | Standard (72) | Hard (111) | Overall (231) |
 | --- | ---: | ---: | ---: | ---: |
-| KaLM v2.5 | 93.75% (45/48) | 51.39% (37/72) | 35.14% (39/111) | 52.38% (121/231) |
-| Qwen3 0.6B | 93.75% (45/48) | 59.72% (43/72) | 34.23% (38/111) | 54.55% (126/231) |
-| Qwen3 4B | 97.92% (47/48) | 62.50% (45/72) | 39.64% (44/111) | **58.87% (136/231)** |
-| E5 large instruct, default | 93.75% (45/48) | 54.17% (39/72) | 26.13% (29/111) | 48.92% (113/231) |
-| E5 large instruct, explicit truncation | 93.75% (45/48) | 54.17% (39/72) | 33.33% (37/111) | 52.38% (121/231) |
+| `KaLM-Embedding/KaLM-embedding-multilingual-mini-instruct-v2.5` | 93.75% (45/48) | 51.39% (37/72) | 35.14% (39/111) | 52.38% (121/231) |
+| `Qwen/Qwen3-Embedding-0.6B` | 93.75% (45/48) | 59.72% (43/72) | 34.23% (38/111) | 54.55% (126/231) |
+| `Qwen/Qwen3-Embedding-4B` | 97.92% (47/48) | 62.50% (45/72) | 39.64% (44/111) | **58.87% (136/231)** |
+| `Qwen/Qwen3-Embedding-8B` | 95.83% (46/48) | 63.89% (46/72) | 36.04% (40/111) | 57.14% (132/231) |
+| `intfloat/multilingual-e5-large-instruct` (default) | 93.75% (45/48) | 54.17% (39/72) | 26.13% (29/111) | 48.92% (113/231) |
+| `intfloat/multilingual-e5-large-instruct` (explicit truncation) | 93.75% (45/48) | 54.17% (39/72) | 33.33% (37/111) | 52.38% (121/231) |
 
 E5's default 512-token limit rejects 53 Hard tasks, which count as incorrect. The supplemental truncation run processes those inputs at 512 tokens. All other runs return valid answers without truncation.
 
-The [JevBench public evaluation](reports/JEVBENCH_PUBLIC.md) compares all four supported models under these settings, with task-type accuracy, calibration, and latency. Aggregated metrics and evaluation settings are available in [JSON format](reports/jevbench-public.json).
+The [JevBench public evaluation](reports/JEVBENCH_PUBLIC.md) compares the five evaluated models under these settings, with task-type accuracy, calibration, and latency. Aggregated metrics and evaluation settings are available in [JSON format](reports/jevbench-public.json).
 
 See the [compatibility boundaries](docs/compatibility.md) and [architecture and design](docs/design.md) for the implementation contract.
 

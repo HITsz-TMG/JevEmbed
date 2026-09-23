@@ -184,7 +184,7 @@ Custom Python backends can integrate other runtimes or fixed vectors for tests.
 
 ## Models, prompts, and loading
 
-The four delivered configurations are KaLM v2.5, Qwen3 0.6B, Qwen3 4B, and multilingual E5 large instruct. Their repository IDs, dimensions, pooling, and limits are listed in the [README](../README.md#supported-models). All use the same four compilation paths. Changing the model does not require rewriting business questions or criteria.
+The five delivered configurations are KaLM v2.5, Qwen3 0.6B, Qwen3 4B, Qwen3 8B, and multilingual E5 large instruct. Their repository IDs, dimensions, pooling, and limits are listed in the [README](../README.md#supported-models). All use the same four compilation paths. Changing the model does not require rewriting business questions or criteria.
 
 KaLM uses repository-defined bidirectional attention and mean pooling. Qwen3 uses last-token pooling. E5 uses XLM-R and mean pooling. E5 accepts 512 tokens including prompts and special tokens; the other public configurations use a 32768-token limit. Adapter validation checks dimensions and loaded metadata.
 

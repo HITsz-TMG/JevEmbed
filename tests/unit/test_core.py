@@ -163,7 +163,7 @@ def test_shipped_scoring_defaults_match_python_api():
     expected = ScoringConfig()
     assert expected.choice_temperature == expected.score_temperature == 0.1
     assert expected.noul_criteria == expected.noul_similarity == LogisticConfig(10.0, 0.0)
-    for name in ("kalm-embedding-v2.5", "qwen3-embedding-0.6b", "qwen3-embedding-4b",
+    for name in ("kalm-embedding-v2.5", "qwen3-embedding-0.6b", "qwen3-embedding-4b", "qwen3-embedding-8b",
                  "multilingual-e5-large-instruct", "http-example"):
         config = ModelConfig.load(ROOT / "configs" / f"{name}.yaml")
         assert config.scoring == expected
@@ -302,7 +302,8 @@ def test_missing_usage():
 def test_default_configs_and_dropped_instruction():
     assert ModelConfig().trust_remote_code is False
     for name, trust in [("kalm-embedding-v2.5", True), ("qwen3-embedding-0.6b", False),
-                        ("multilingual-e5-large-instruct", False), ("qwen3-embedding-4b", False)]:
+                        ("multilingual-e5-large-instruct", False), ("qwen3-embedding-4b", False),
+                        ("qwen3-embedding-8b", False)]:
         cfg = ModelConfig.load(ROOT / f"configs/{name}.yaml")
         assert cfg.trust_remote_code is trust and cfg.local_files_only is False
         assert cfg.model_name_or_path in cfg.aliases
