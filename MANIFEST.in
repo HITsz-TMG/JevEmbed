@@ -1,7 +1,8 @@
 include README.md
 include requirements*.txt
+recursive-include assets *.png
 recursive-include configs *.yaml
-recursive-include examples *.json *.md
+recursive-include examples *.json *.jsonl *.md
 recursive-include docs *.md
 recursive-include reports *.md *.json
 recursive-include scripts *.py *.sh

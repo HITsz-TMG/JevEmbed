@@ -73,6 +73,20 @@ def test_loading_failure_never_enables_trust(fake_runtime):
     assert fake_runtime["load_calls"][0][1]["trust_remote_code"] is False
 
 
+def test_adapter_loading_and_provenance(fake_runtime, tmp_path, monkeypatch):
+    calls = []
+    monkeypatch.setattr(sys.modules["sentence_transformers"].SentenceTransformer, "load_adapter",
+                        lambda self, *args, **kwargs: calls.append((args, kwargs)), raising=False)
+    (tmp_path / "adapter_config.json").write_text('{"r":8}')
+    (tmp_path / "adapter_model.safetensors").write_bytes(b"mock adapter")
+    cfg = ModelConfig(model_name_or_path="fake", adapter_name_or_path=str(tmp_path),
+                      adapter_revision="commit", local_files_only=True)
+    metadata = SentenceTransformersBackend(config=cfg).prepare()
+    assert calls == [((str(tmp_path),), {"revision":"commit", "is_trainable":False,
+                                      "adapter_kwargs":{"local_files_only":True}})]
+    assert set(metadata["adapter"]["files_sha256"]) == {"adapter_config.json", "adapter_model.safetensors"}
+
+
 def test_missing_dependency(fake_runtime, monkeypatch):
     monkeypatch.setitem(sys.modules, "sentence_transformers", None)
     with pytest.raises(BackendError, match="compatible environment"):

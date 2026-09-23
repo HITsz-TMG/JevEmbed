@@ -51,6 +51,10 @@ class SentenceTransformersBackend:
             model = SentenceTransformer(cfg.model_name_or_path, revision=cfg.revision,
                                         trust_remote_code=cfg.trust_remote_code, device=device,
                                         local_files_only=cfg.local_files_only, model_kwargs=model_kwargs)
+            if cfg.adapter_name_or_path:
+                model.load_adapter(cfg.adapter_name_or_path, revision=cfg.adapter_revision,
+                                   is_trainable=False,
+                                   adapter_kwargs={"local_files_only": cfg.local_files_only})
         except Exception as exc:
             raise BackendError(f"Cannot load {cfg.model_id} from {cfg.model_name_or_path} "
                                f"(trust_remote_code={cfg.trust_remote_code}); check this model's "
@@ -95,6 +99,17 @@ class SentenceTransformersBackend:
                          "attention_implementation": getattr(model_config, "_attn_implementation", None),
                          "is_causal": getattr(model_config, "is_causal", None),
                          "versions": {name: importlib.metadata.version(name) for name in ("torch", "transformers", "sentence-transformers")}}
+        if cfg.adapter_name_or_path:
+            adapter_root = Path(cfg.adapter_name_or_path)
+            adapter_files = {}
+            if adapter_root.is_dir():
+                for path in sorted(adapter_root.glob("adapter*")):
+                    if path.is_file() and path.suffix in (".json", ".safetensors"):
+                        adapter_files[path.name] = hashlib.sha256(path.read_bytes()).hexdigest()
+            self.metadata["adapter"] = {"name_or_path": cfg.adapter_name_or_path,
+                                        "requested_revision": cfg.adapter_revision,
+                                        "files_sha256": adapter_files,
+                                        "peft_version": importlib.metadata.version("peft")}
         self._model = model
 
     def encode(self, items):

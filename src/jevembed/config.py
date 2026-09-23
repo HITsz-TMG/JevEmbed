@@ -14,10 +14,13 @@ class PromptConfig:
     document_template: str = "{text}"
     similarity_instruction: str = "Retrieve semantically similar text."
     version: str = "v1"
+    noul_format: str = "legacy"
 
     def __post_init__(self):
         if any(not isinstance(value, str) for value in (self.query_template, self.document_template, self.similarity_instruction, self.version)):
             raise ValidationError("Prompt settings must be strings")
+        if self.noul_format not in ("legacy", "unified", "retrieval"):
+            raise ValidationError("noul_format must be legacy, unified, or retrieval")
         for template in (self.query_template, self.document_template):
             try:
                 fields = {f for _, f, _, _ in Formatter().parse(template) if f is not None}
@@ -30,7 +33,7 @@ class PromptConfig:
 
 @dataclass(frozen=True)
 class LogisticConfig:
-    slope: float = 1.0
+    slope: float = 10.0
     intercept: float = 0.0
 
     def __post_init__(self):
@@ -41,8 +44,8 @@ class LogisticConfig:
 
 @dataclass(frozen=True)
 class ScoringConfig:
-    choice_temperature: float = 0.5
-    score_temperature: float = 0.5
+    choice_temperature: float = 0.1
+    score_temperature: float = 0.1
     noul_criteria: LogisticConfig = field(default_factory=LogisticConfig)
     noul_similarity: LogisticConfig = field(default_factory=LogisticConfig)
     confidence: str = "normalized_entropy"
@@ -64,6 +67,8 @@ class ModelConfig:
     model_name_or_path: str = ""
     revision: str | None = None
     code_revision: str | None = None
+    adapter_name_or_path: str | None = None
+    adapter_revision: str | None = None
     trust_remote_code: bool = False
     local_files_only: bool = False
     device: str = "auto"
@@ -88,6 +93,14 @@ class ModelConfig:
     aliases: tuple[str, ...] = ()
 
     def __post_init__(self):
+        for name in ("adapter_name_or_path", "adapter_revision"):
+            value = getattr(self, name)
+            if value is not None and (not isinstance(value, str) or not value):
+                raise ValidationError(f"{name} must be a nonempty string or null")
+        if self.adapter_revision and not self.adapter_name_or_path:
+            raise ValidationError("adapter_revision requires adapter_name_or_path")
+        if self.adapter_name_or_path and self.backend != "sentence_transformers":
+            raise ValidationError("LoRA adapters require the sentence_transformers backend")
         for name in ("trust_remote_code", "local_files_only", "normalize_embeddings", "server_enforces_length"):
             if type(getattr(self, name)) is not bool:
                 raise ValidationError(f"{name} must be an explicit boolean")

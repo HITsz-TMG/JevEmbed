@@ -1,0 +1,22 @@
+# Single-device training. Batch size counts Jev questions, not encoded texts.
+epochs: 1
+batch_size: 32
+gradient_accumulation_steps: 4
+learning_rate: 0.0002
+warmup_ratio: 0.1
+weight_decay: 0.01
+max_grad_norm: 1.0
+max_steps: -1
+max_input_tokens: 1024
+overflow_policy: error
+gradient_checkpointing: true
+lora_rank: 8
+lora_alpha: 16
+lora_dropout: 0.05
+# null discovers q_proj/v_proj (KaLM, Qwen3) or query/value (E5).
+target_modules: null
+seed: 42
+logging_steps: 10
+save_steps: 100
+save_total_limit: 2
+threads: 4

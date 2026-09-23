@@ -18,10 +18,11 @@ prompts:
   query_template: "Instruct: {instruction}\nQuery: {text}"
   document_template: "{text}"
   similarity_instruction: "Retrieve semantically similar text."
+  noul_format: retrieval
 scoring:
-  choice_temperature: 0.5
-  score_temperature: 0.5
-  noul_criteria: {slope: 1.0, intercept: 0.0}
-  noul_similarity: {slope: 1.0, intercept: 0.0}
+  choice_temperature: 0.1
+  score_temperature: 0.1
+  noul_criteria: {slope: 10.0, intercept: 0.0}
+  noul_similarity: {slope: 10.0, intercept: 0.0}
   confidence: normalized_entropy
   calibration_status: uncalibrated

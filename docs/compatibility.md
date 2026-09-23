@@ -9,7 +9,7 @@ JevEmbed v0.1 implements Jev-shaped JSON contracts. The original implementation 
 | Choice | 1–255 candidates; null descriptions encode the name alone; ties follow request order |
 | Score | 2–10 levels; level numbers are excluded from encoded text; full distribution with string numeric keys |
 | Structured Score legend | Original objects and arrays are retained; the official output table describes `map<string,string>`, and this boundary has not been validated against its SDK |
-| Noul | Only `type` and `noul`; two fixed mappings, without generated counterexamples or an unknown class |
+| Noul | Only `type` and `noul`; shipped models encode all inputs under a fixed retrieval instruction, using a similarity difference with criteria or one similarity without criteria; legacy and fixed yes/no mappings remain optional |
 | Model selection | Explicit registration and aliases; canonical response ID; no silent fallback |
 | HTTP model field | Required; Python calls may use the default model |
 | Validation | Unknown fields, empty questions, invalid JSON, NaN/Infinity, and ambiguous criteria return 422 |
@@ -25,4 +25,4 @@ JevEmbed v0.1 implements Jev-shaped JSON contracts. The original implementation 
 
 The supported model configurations are listed in the [README](../README.md#supported-models). NV-Embed-v2 is not supported.
 
-This release does not include training, automatic prompt optimization, or scalar calibration fitting. The [JevBench evaluation](../reports/JEVBENCH_PUBLIC.md) reports accuracy on 231 public tasks for all four supported models, distinguishing E5's default length-limit refusals from explicit truncation; it does not cover the full benchmark suite.
+Optional [LoRA training](training.md) supports supervised Jev tasks on one device. Automatic prompt optimization and scalar calibration fitting are not implemented. The [JevBench evaluation](../reports/JEVBENCH_PUBLIC.md) reports base-model accuracy on 231 public tasks for all four supported models under the current scoring and prompt settings, distinguishing E5's default length-limit refusals from explicit truncation. Separate [KaLM](../reports/OPEN_JEV_KALM_LORA.md) and [Qwen3 0.6B](../reports/OPEN_JEV_QWEN3_0.6B_LORA.md) reports compare base and LoRA models. None of these results covers the full benchmark suite.

@@ -1,6 +1,6 @@
 # Architecture and design
 
-Version: 0.1. Updated: 2026-09-22.
+Version: 0.1. Updated: 2026-09-23.
 
 This document consolidates the original implementation specification into an English developer reference. The implementation, public configurations, and compatibility report describe the delivered MVP; future work is identified separately.
 
@@ -8,7 +8,7 @@ This document consolidates the original implementation specification into an Eng
 
 JevEmbed converts Choice, Score, and Noul requests into embedding comparisons using interchangeable instruction embedding models. It preserves original instructions and returns Jev-shaped JSON fields. Compatibility covers data structures and field constraints, not Jev's model architecture, training, decision quality, confidence formula, or calibration.
 
-The MVP includes a Python API, local and HTTP embedding backends, configurable templates, batching, caching, scoring parameters, diagnostics, a CLI, an optional HTTP API, tests, and documentation. Model training, automatic prompt optimization, generated criteria, agent execution, authorization decisions, and a frontend are outside its scope. Calibration fitting and larger labeled evaluations are future work.
+JevEmbed v0.1 includes a Python API, local and HTTP embedding backends, configurable templates, batching, caching, scoring parameters, diagnostics, a CLI, an optional HTTP API, and [LoRA fine-tuning](training.md) for supervised Jev tasks. Automatic prompt optimization, generated criteria, agent execution, authorization decisions, and a frontend are outside its scope. Calibration fitting and broader independent evaluations remain future work.
 
 ## Request contract
 
@@ -36,7 +36,7 @@ The model must be registered. HTTP requires an explicit model; Python calls may 
 | Score | Ordered array of 2–10 strings, objects, or arrays |
 | Noul | Omitted, or a complete mapping with `true` and `false` descriptions |
 
-Empty, partial, and null Noul criteria are rejected. No missing counterexample is generated. A single Choice candidate has probability and confidence equal to 1.
+Empty, partial, and null Noul criteria are rejected. When criteria are omitted, the shipped configurations compare the state and question as separate queries. A single Choice candidate has probability and confidence equal to 1.
 
 ## Response contract
 
@@ -107,35 +107,42 @@ The complete distribution is retained because different distributions can have t
 
 ### Noul with criteria
 
-Encode the original instructions and state as a query. Encode the true and false descriptions as separate documents in that fixed order, regardless of the incoming JSON key order. The keys themselves are not prepended to the descriptions.
-
-```text
-Instruct: Has the customer contacted support about this before?
-Query: I have asked three times now. Can I please just talk to a real person?
-```
-
-Documents:
-
-```text
-Mentions a prior attempt, ticket, or that they have asked before
-No sign of any previous contact
-```
-
-### Noul without criteria
-
-Both inputs use the query role and the fixed instruction `Retrieve semantically similar text.`. The original state and original instructions become the two query texts:
+The shipped configurations set `noul_format: retrieval`. Encode the state as a query under the fixed retrieval instruction:
 
 ```text
 Instruct: Retrieve semantically similar text.
 Query: I have asked three times now. Can I please just talk to a real person?
 ```
+
+Encode the original question plus each criterion as separate query-role inputs, in true/false order regardless of JSON key order. A newline separates the question and criterion; the true/false keys are not added to the text:
+
+```text
+Instruct: Retrieve semantically similar text.
+Query: Has the customer contacted support about this before?
+Mentions a prior attempt, ticket, or that they have asked before
+```
+
+```text
+Instruct: Retrieve semantically similar text.
+Query: Has the customer contacted support about this before?
+No sign of any previous contact
+```
+
+### Noul without criteria
+
+Encode the original question and state separately as queries under the same fixed retrieval instruction:
 
 ```text
 Instruct: Retrieve semantically similar text.
 Query: Is the customer asking for a human agent?
 ```
 
-The second input does not use the document template. The same state embedding can be reused across multiple questions on this path. No true/false propositions or unknown category are generated. This path measures semantic similarity and cannot inherently distinguish negation, contradiction, and support.
+```text
+Instruct: Retrieve semantically similar text.
+Query: I have asked three times now. Can I please just talk to a real person?
+```
+
+This path uses one cosine similarity and generates no true/false candidates or unknown category. Bare `PromptConfig()` retains the older `legacy` mapping for compatibility; the optional `unified` mapping uses fixed yes/no documents. Both remain available for existing adapters. The shipped `retrieval` mapping does not inherently distinguish semantic relevance from agreement.
 
 ## Scoring
 
@@ -149,16 +156,16 @@ score = sum(i * p_i)
 confidence = 1 - entropy(p) / log(K)
 ```
 
-Temperatures are finite and positive, with independent Choice and Score defaults of 0.5. Ties in Choice follow request order. Confidence is clamped to [0,1] and is 1 for K=1. It measures concentration, not accuracy; callers can inject a custom estimator.
+Temperatures are finite and positive, with independent Choice and Score defaults of 0.1. Ties in Choice follow request order. Confidence is clamped to [0,1] and is 1 for K=1. It measures concentration, not accuracy; callers can inject a custom estimator.
 
 ```text
 Noul with criteria:
-  sigmoid(a_criteria * (cosine(q, true) - cosine(q, false)) + b_criteria)
+  sigmoid(a_criteria * (cosine(q_state, q_question_true) - cosine(q_state, q_question_false)) + b_criteria)
 Noul without criteria:
-  sigmoid(a_similarity * cosine(query_state, query_instruction) + b_similarity)
+  sigmoid(a_similarity * cosine(q_question, q_state) + b_similarity)
 ```
 
-Both Noul parameter pairs default to slope 1 and intercept 0. All default mappings are uncalibrated. A value in [0,1] is not evidence of calibration. See [calibration](calibration.md) for configuration, fitting records, and evaluation requirements.
+Both Noul parameter pairs default to slope 10 and intercept 0, corresponding to temperature 0.1 under `slope = 1/T` in their logistic mappings. All default mappings are uncalibrated. A value in [0,1] is not evidence of calibration. See [calibration](calibration.md) for configuration, fitting records, and evaluation requirements.
 
 ## Backend contract
 

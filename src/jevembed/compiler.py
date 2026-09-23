@@ -4,6 +4,12 @@ from .backends.base import EmbeddingInput
 from .serialization import serialize
 
 
+_NOUL_FALLBACK = {
+    "true": "The answer to the question is yes.",
+    "false": "The answer to the question is no.",
+}
+
+
 @dataclass
 class TaskPlan:
     question_id: str
@@ -23,7 +29,17 @@ def compile_request(request, prompts):
         criteria = question.get("criteria")
         labels, legend = [], {}
         query = EmbeddingInput("query", instruction, state)
-        if kind == "noul" and "criteria" not in question:
+        if kind == "noul" and prompts.noul_format == "retrieval":
+            state_query = EmbeddingInput("query", prompts.similarity_instruction, state)
+            if "criteria" in question:
+                labels = ["true", "false"]
+                inputs = [state_query] + [EmbeddingInput("query", prompts.similarity_instruction,
+                            f"{instruction}\n{serialize(criteria[label])}") for label in labels]
+                path = "noul_criteria"
+            else:
+                inputs = [EmbeddingInput("query", prompts.similarity_instruction, instruction), state_query]
+                path = "noul_similarity"
+        elif kind == "noul" and "criteria" not in question and prompts.noul_format == "legacy":
             inputs = [EmbeddingInput("query", prompts.similarity_instruction, state),
                       EmbeddingInput("query", prompts.similarity_instruction, instruction)]
             path = "noul_similarity"
@@ -38,7 +54,8 @@ def compile_request(request, prompts):
                 legend = dict(zip(labels, criteria))
             else:
                 labels = ["true", "false"]
-                texts = [serialize(criteria[label]) for label in labels]
+                source = _NOUL_FALLBACK if criteria is None else criteria
+                texts = [serialize(source[label]) for label in labels]
             inputs = [query] + [EmbeddingInput("document", "", text) for text in texts]
         plans.append(TaskPlan(qid, kind, path, inputs, labels, legend))
     return plans

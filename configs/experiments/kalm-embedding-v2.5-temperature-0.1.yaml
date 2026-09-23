@@ -1,27 +1,29 @@
-model_id: qwen3-embedding-4b
+# KaLM v2.5 experiment: temperature 0.1 for Choice, Score, and both Noul paths.
+# Noul uses sigmoid(slope * similarity + intercept); slope = 1 / temperature.
+model_id: kalm-embedding-v2.5
 backend: sentence_transformers
-model_name_or_path: Qwen/Qwen3-Embedding-4B
-aliases: [Qwen/Qwen3-Embedding-4B]
-trust_remote_code: false
+model_name_or_path: KaLM-Embedding/KaLM-embedding-multilingual-mini-instruct-v2.5
+aliases: [KaLM-Embedding/KaLM-embedding-multilingual-mini-instruct-v2.5]
+revision: null
+trust_remote_code: true
 local_files_only: false
 device: auto
 dtype: auto
-batch_size: 8
+batch_size: 16
 pooling: model_default
 normalize_embeddings: true
-expected_dimension: 2560
-# Model card's supported context; architecture's 40960 positions are not the serving limit.
-max_input_tokens: 32768
+expected_dimension: 896
+max_input_tokens: model_default
 overflow_policy: error
 attention_implementation: sdpa
 prompts:
   query_template: "Instruct: {instruction}\nQuery: {text}"
   document_template: "{text}"
   similarity_instruction: "Retrieve semantically similar text."
-  noul_format: retrieval
 scoring:
   choice_temperature: 0.1
   score_temperature: 0.1
   noul_criteria: {slope: 10.0, intercept: 0.0}
   noul_similarity: {slope: 10.0, intercept: 0.0}
+  confidence: normalized_entropy
   calibration_status: uncalibrated
