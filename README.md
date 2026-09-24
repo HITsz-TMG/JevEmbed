@@ -10,6 +10,7 @@ JevEmbed is a Python framework for embedding-based Choice, Score, and Noul decis
 
 ## News
 
+- **September 24, 2026:** JevEmbed now supports [CLM-v0.1-8B](https://huggingface.co/Contrastive-LM/CLM-v0.1-8B) for Choice, Score, and Noul decisions. See the [CLM setup guide](docs/clm.md).
 - **September 24, 2026:** [JevEmbed-Data](https://huggingface.co/datasets/HIT-TMG/JevEmbed-Data) is available for fine-tuning, with 1.67 million labeled Choice, Score, and Noul questions.
 
 ## Installation
