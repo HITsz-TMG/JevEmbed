@@ -1,0 +1,131 @@
+{
+  "date": "2026-09-24",
+  "model": "clm-v0.1-8b",
+  "base_model": "Qwen/Qwen3-8B",
+  "base_revision": "b968826d9c46dd6066d109eabc6255188de91218",
+  "projection": "Contrastive-LM/CLM-v0.1-8B",
+  "projection_revision": "87655cb835bd76fd66c2da78e1e3709f7fa11a94",
+  "configuration": "configs/clm-v0.1-8b.yaml",
+  "protocol": {
+    "scope": "231 JevBench public tasks; not a full official leaderboard score",
+    "encoder_runtime": "Transformers AutoModel 4.51.0",
+    "projection_runtime": "PyTorch 2.8.0",
+    "dtype": "bfloat16",
+    "device": "cuda",
+    "cache_capacity": 0,
+    "choice_temperature": 0.01,
+    "score_temperature": 0.01,
+    "noul_slope": 100.0,
+    "noul_intercept": 0.0,
+    "max_input_tokens": 2048,
+    "overflow_policy": "truncate",
+    "query_truncation": "keep tail",
+    "candidate_truncation": "keep head",
+    "encoder_pooling": "last_token",
+    "projection_dimension": 512
+  },
+  "base_and_projection_weight_sha256": {
+    "model-00001-of-00005.safetensors": "31d6a825ae35f11fb85b195b4c42c146c051e446433125a215336abdf95cbf5f",
+    "model-00002-of-00005.safetensors": "5991236cea6fe21f3d43cab0f0e84448734fbbe0789816202989f2ddc9d18282",
+    "model-00003-of-00005.safetensors": "c5185c4794be2d8a9784d5753c9922db38df478ce11f9ed0b415b7304d896836",
+    "model-00004-of-00005.safetensors": "b5ee7de71fbf17db3d5704e0c8f2bc7d005ca9e1d7ca2aeb19827b0cfcaa917a",
+    "model-00005-of-00005.safetensors": "20c2d6366ab85c90786ccdd829cd2b9e7d30ef3b2ebbb998280e7e4014b542ff",
+    "projection/CLM_v0.1-8B.pt": "b2b4a8c9c2d39263eff78a351eb909a342ce9b3bf21a3f07c1d1bf15f1c4eda5"
+  },
+  "benchmark_manifest_sha256": "0983ad3e73a34e7c55b02b5d09ed983aeccabef0253bb31be43a2e6230d58f7b",
+  "dataset_sha256": {
+    "datasets/public/easy.jsonl": "231df3c2c8e88a1a8c137ebe85de96ba70fabd330849098ac7b3c52c70b7172b",
+    "datasets/public/original.jsonl": "5c2414edb3006b8bfcb70fda433f0f9ca015759433849f8d3104328a1f7c4180",
+    "datasets/public/hard.jsonl": "89e9e6becb33ed88c1de7d42dcc87531b2fb64cfaef4e1986faf7c37b3f80ebb"
+  },
+  "overall": {
+    "n": 231,
+    "correct": 97,
+    "accuracy": 0.4199134199134199,
+    "valid": 231,
+    "score_mae": 0.9771854761225879,
+    "brier": 0.851515318143114,
+    "ece": 0.3575389867765816,
+    "p50_s": 0.0856171976774931,
+    "p95_s": 0.4016320202499628
+  },
+  "tiers": {
+    "easy": {
+      "n": 48,
+      "correct": 33,
+      "accuracy": 0.6875,
+      "valid": 48,
+      "score_mae": null,
+      "brier": 0.44238446631807055,
+      "ece": 0.15021435854937099,
+      "p50_s": 0.07938741892576218,
+      "p95_s": 0.09705488169565796
+    },
+    "standard": {
+      "n": 72,
+      "correct": 25,
+      "accuracy": 0.3472222222222222,
+      "valid": 72,
+      "score_mae": 0.8783956661662004,
+      "brier": 1.0045193572496303,
+      "ece": 0.47777174841029124,
+      "p50_s": 0.07827398180961609,
+      "p95_s": 0.13228774406015872
+    },
+    "hard": {
+      "n": 111,
+      "correct": 39,
+      "accuracy": 0.35135135135135137,
+      "valid": 111,
+      "score_mae": 1.174765096035363,
+      "brier": 0.9291909043767438,
+      "ece": 0.39827444526210687,
+      "p50_s": 0.12385454773902893,
+      "p95_s": 0.4066803306341171
+    }
+  },
+  "primitives": {
+    "choice": {
+      "n": 139,
+      "correct": 54,
+      "accuracy": 0.38848920863309355,
+      "valid": 139,
+      "score_mae": null,
+      "brier": 0.8897668570842326,
+      "ece": 0.36235841132074764,
+      "p50_s": 0.09711185283958912,
+      "p95_s": 0.4044436296448112
+    },
+    "score": {
+      "n": 18,
+      "correct": 3,
+      "accuracy": 0.16666666666666666,
+      "valid": 18,
+      "score_mae": 0.9771854761225879,
+      "brier": 1.270594605447287,
+      "ece": 0.6316742845046557,
+      "p50_s": 0.07923056930303574,
+      "p95_s": 0.4003413933329284
+    },
+    "noul": {
+      "n": 74,
+      "correct": 40,
+      "accuracy": 0.5405405405405406,
+      "valid": 74,
+      "score_mae": null,
+      "brier": 0.6777262494364845,
+      "ece": 0.2940759924136408,
+      "p50_s": 0.061344023793935776,
+      "p95_s": 0.37198417177423837
+    }
+  },
+  "truncation": {
+    "tasks_with_truncated_inputs": 36,
+    "correct": 13,
+    "tasks_without_truncation": 195,
+    "correct_without_truncation": 84
+  },
+  "hard_gold_probability_items": 10,
+  "hard_mean_tvd": 0.4498942709780797,
+  "peak_cuda_allocated_bytes": 15701099008
+}

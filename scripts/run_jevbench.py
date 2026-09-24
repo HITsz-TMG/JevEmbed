@@ -76,6 +76,7 @@ def main():
     parser.add_argument("--benchmark-root", type=Path, required=True)
     parser.add_argument("--config", type=Path, required=True)
     parser.add_argument("--model-path", type=Path, help="Optional local weights; enables offline loading")
+    parser.add_argument("--projection-path", type=Path, help="Optional local paired-projection checkpoint directory")
     parser.add_argument("--output", type=Path, required=True, help="New output directory outside the benchmark repository")
     parser.add_argument("--device", default="cuda")
     parser.add_argument("--dtype", default="auto", choices=["auto", "float32", "bfloat16", "float16"])
@@ -90,7 +91,6 @@ def main():
     sys.path.insert(0, str(benchmark))
     sys.path.insert(0, str(root / "src"))
     from jevembed import JevEmbed, ModelConfig
-    from jevembed.backends import SentenceTransformersBackend
     from jevbench.budget import Ledger
     from jevbench.runner import Runner
     from jevbench.summarize import summarize
@@ -102,6 +102,8 @@ def main():
     cfg = replace(ModelConfig.load(args.config), device=args.device, dtype=args.dtype, cache_capacity=0)
     if args.model_path:
         cfg = replace(cfg, model_name_or_path=str(args.model_path.resolve()), local_files_only=True)
+    if args.projection_path:
+        cfg = replace(cfg, projection_name_or_path=str(args.projection_path.resolve()), local_files_only=True)
     if cfg.device.startswith("cuda") and not torch.cuda.is_available():
         raise RuntimeError("CUDA was requested but is unavailable; refusing a silent CPU fallback")
     synchronize = (lambda: torch.cuda.synchronize(cfg.device)) if cfg.device.startswith("cuda") else (lambda: None)
@@ -120,8 +122,8 @@ def main():
     tasks = [task for group in tiers.values() for task in group]
     if len({t.id for t in tasks}) != len(tasks):
         raise ValueError("Duplicate task IDs in public data")
-    backend = SentenceTransformersBackend(config=cfg)
-    client = JevEmbed(config=cfg, backend=backend)
+    client = JevEmbed(config=cfg)
+    backend = client._models[cfg.model_id].backend
     adapter = JevEmbedAdapter(client, cfg.model_id, synchronize)
     if not cfg.device.startswith("cuda"):
         adapter.cost_basis = "local_cpu_no_provider_tariff"
@@ -147,6 +149,11 @@ def main():
         torch.cuda.reset_peak_memory_stats(cfg.device)
     print("Recording weight hashes", flush=True)
     weights = {path.name: sha256(path) for path in sorted(Path(cfg.model_name_or_path).glob("*.safetensors"))}
+    if cfg.projection_name_or_path:
+        projection_root = Path(cfg.projection_name_or_path)
+        projection_file = projection_root if projection_root.is_file() else projection_root / cfg.projection_filename
+        if projection_file.is_file():
+            weights[f"projection/{projection_file.name}"] = sha256(projection_file)
     metadata = {
         "started_utc": started, "model": cfg.model_id, "config": asdict(cfg),
         "identity": identity, "model_weight_sha256": weights,

@@ -46,6 +46,13 @@ def normalized_entropy(probabilities):
     return min(1.0, max(0.0, 1 - entropy / math.log(len(probabilities))))
 
 
+def top_margin(probabilities):
+    if len(probabilities) < 2:
+        return 1.0
+    top = max(probabilities)
+    return min(1.0, max(0.0, top - (math.fsum(probabilities) - top) / (len(probabilities) - 1)))
+
+
 def sigmoid(value):
     if value >= 0:
         return 1 / (1 + math.exp(-value))
@@ -53,16 +60,17 @@ def sigmoid(value):
     return exponential / (1 + exponential)
 
 
-def score_plan(plan, vectors, config, confidence_estimator=normalized_entropy):
+def score_plan(plan, vectors, config, confidence_estimator=None):
     query = vectors[0]
     similarities = [min(1.0, max(-1.0, math.fsum(a*b for a, b in zip(query, vector)))) for vector in vectors[1:]]
     if plan.kind == "noul":
         parameters = getattr(config, plan.path)
-        value = similarities[0] if plan.path == "noul_without_criteria" else similarities[0] - similarities[1]
+        value = similarities[0] if len(similarities) == 1 else similarities[0] - similarities[1]
         answer = {"type": "noul", "noul": sigmoid(parameters.slope * value + parameters.intercept)}
     else:
         probabilities = softmax(similarities, getattr(config, f"{plan.kind}_temperature"))
-        confidence = float(confidence_estimator(probabilities))
+        estimator = confidence_estimator or (top_margin if config.confidence == "top_margin" else normalized_entropy)
+        confidence = float(estimator(probabilities))
         if not math.isfinite(confidence) or not 0 <= confidence <= 1:
             raise BackendError("ConfidenceEstimator must return a finite value in [0, 1]")
         answer = {"type": plan.kind, "probabilities": dict(zip(plan.labels, probabilities)), "confidence": confidence}

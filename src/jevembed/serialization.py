@@ -3,7 +3,7 @@ import math
 
 from .errors import ValidationError
 
-SERIALIZATION_VERSION = "compact-sorted-unicode-v1"
+SERIALIZATION_VERSION = "configurable-text-v2"
 
 
 def validate_json(value):
@@ -34,3 +34,39 @@ def serialize(value):
     validate_json(value)
     return value if isinstance(value, str) else json.dumps(
         value, ensure_ascii=False, sort_keys=True, separators=(",", ":"), allow_nan=False)
+
+
+def serialize_for_mode(value, mode):
+    if mode == "compact_json":
+        return serialize(value)
+    if mode != "prose":
+        raise ValidationError(f"Unknown serialization mode: {mode}")
+    validate_json(value)
+
+    def render(item, indent=0):
+        if item is None:
+            return ""
+        if isinstance(item, str):
+            return item
+        if isinstance(item, bool):
+            return "true" if item else "false"
+        if isinstance(item, (int, float)):
+            return str(item)
+        padding = " " * indent
+        if isinstance(item, dict):
+            lines = []
+            for key, entry in item.items():
+                if isinstance(entry, (dict, list)) and entry:
+                    lines.append(f"{padding}{key}:\n{render(entry, indent + 2)}")
+                else:
+                    lines.append(f"{padding}{key}: {render(entry)}")
+            return ("\n\n" if indent == 0 else "\n").join(lines)
+        lines = []
+        for entry in item:
+            if isinstance(entry, (dict, list)) and entry:
+                lines.append(f"{padding}-\n{render(entry, indent + 2)}")
+            else:
+                lines.append(f"{padding}- {render(entry)}")
+        return "\n".join(lines)
+
+    return render(value)

@@ -7,14 +7,14 @@ import math
 import threading
 import time
 
-from .backends import HTTPEmbeddingBackend, SentenceTransformersBackend
+from .backends import HTTPEmbeddingBackend, PairedProjectionBackend, SentenceTransformersBackend
 from .cache import EmbeddingCache
 from .compiler import compile_request
 from .config import ModelConfig
 from .errors import BackendError, ValidationError
 from .prompts import PromptAdapter
 from .schemas import validate_request
-from .scoring import normalize_vectors, normalized_entropy, score_plan
+from .scoring import normalize_vectors, score_plan
 from .serialization import SERIALIZATION_VERSION
 
 
@@ -29,7 +29,7 @@ class _Model:
 
 
 class JevEmbed:
-    def __init__(self, backend=None, model=None, config=None, *, confidence_estimator=normalized_entropy):
+    def __init__(self, backend=None, model=None, config=None, *, confidence_estimator=None):
         self._models, self._aliases = {}, {}
         self.default_model = model or (config.model_id if config else None)
         self.confidence_estimator = confidence_estimator
@@ -46,6 +46,8 @@ class JevEmbed:
         if backend is None:
             if config.backend == "sentence_transformers":
                 backend = SentenceTransformersBackend(config=config)
+            elif config.backend == "paired_projection":
+                backend = PairedProjectionBackend(config=config)
             elif config.backend == "http":
                 backend = HTTPEmbeddingBackend(config)
             else:
@@ -114,7 +116,7 @@ class JevEmbed:
         # Built-in backends protect their own mutable state. Local encode calls
         # serialize inside SentenceTransformersBackend; HTTP calls may overlap.
         # Unknown custom backends retain whole-request serialization.
-        built_in = isinstance(entry.backend, (HTTPEmbeddingBackend, SentenceTransformersBackend))
+        built_in = isinstance(entry.backend, (HTTPEmbeddingBackend, PairedProjectionBackend, SentenceTransformersBackend))
         with (nullcontext() if built_in else entry.lock):
             provenance = entry.backend.prepare() if hasattr(entry.backend, "prepare") else {}
             identity = hashlib.sha256(json.dumps(provenance, sort_keys=True).encode()).hexdigest()

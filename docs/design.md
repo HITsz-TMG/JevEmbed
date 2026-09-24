@@ -1,8 +1,8 @@
 # Architecture and design
 
-Version: 0.1. Updated: 2026-09-23.
+Version: 0.1. Updated: 2026-09-24.
 
-This document consolidates the original implementation specification into an English developer reference. The implementation, public configurations, and compatibility report describe the delivered MVP; future work is identified separately.
+This document describes JevEmbed's architecture, public configurations, and compatibility boundaries.
 
 ## Purpose and scope
 
@@ -36,7 +36,7 @@ The model must be registered. HTTP requires an explicit model; Python calls may 
 | Score | Ordered array of 2–10 strings, objects, or arrays |
 | Noul | Omitted, or a complete mapping with `true` and `false` descriptions |
 
-Empty, partial, and null Noul criteria are rejected. When criteria are omitted, the shipped configurations compare the state and question as separate queries. A single Choice candidate has probability and confidence equal to 1.
+Empty, partial, and null Noul criteria are rejected. When criteria are omitted, the default embedding configurations compare the state and question as separate queries; CLM compares the state/question input with true/false candidates. A single Choice candidate has probability and confidence equal to 1.
 
 ## Response contract
 
@@ -54,9 +54,9 @@ Usage contains `input_tokens` and `output_tokens`; the latter is zero because no
 
 ## Compilation and serialization
 
-Strings are preserved verbatim. Structured values use deterministic compact JSON with sorted object keys, preserved Unicode, and unchanged array order. Field references such as `ticket.message` remain literal instruction text; the compiler does not extract fields automatically.
+Strings are preserved verbatim. The default configurations serialize structured values as deterministic compact JSON with sorted object keys and preserved Unicode. CLM uses prose serialization configured in its YAML file. Field references such as `ticket.message` remain literal instruction text; the compiler does not extract fields automatically.
 
-The default templates are:
+The default Sentence Transformers templates are:
 
 ```text
 Query:    Instruct: {instruction}\nQuery: {text}
@@ -141,7 +141,7 @@ Instruct: Retrieve semantically similar text.
 Query: I have asked three times now. Can I please just talk to a real person?
 ```
 
-This path uses one cosine similarity and generates no true/false candidates or unknown category. The retrieval mapping does not inherently distinguish semantic relevance from agreement.
+This default path uses one cosine similarity and generates no true/false candidates or unknown category. The retrieval mapping does not inherently distinguish semantic relevance from agreement. CLM instead uses two candidates for both Noul forms; see the [CLM guide](clm.md).
 
 ## Scoring
 
@@ -152,10 +152,10 @@ s_i = cosine(query, document_i)
 p_i = stable_softmax(s_i / temperature)
 choice = argmax(p_i)
 score = sum(i * p_i)
-confidence = 1 - entropy(p) / log(K)
+confidence = 1 - entropy(p) / log(K)  # default
 ```
 
-Temperatures are finite and positive, with independent Choice and Score defaults of 0.1. Ties in Choice follow request order. Confidence is clamped to [0,1] and is 1 for K=1. It measures concentration, not accuracy; callers can inject a custom estimator.
+Temperatures are finite and positive, with independent Choice and Score defaults of 0.1; CLM configures 0.01. Ties in Choice follow request order. Confidence is clamped to [0,1] and is 1 for K=1. CLM selects the top-probability margin instead of entropy. Both measure concentration, not accuracy; callers can inject a custom estimator.
 
 ```text
 Noul with criteria:
@@ -164,7 +164,7 @@ Noul without criteria:
   sigmoid(a_without * cosine(q_question, q_state) + b_without)
 ```
 
-Both Noul parameter pairs default to slope 10 and intercept 0, corresponding to temperature 0.1 under `slope = 1/T` in their logistic mappings. All default mappings are uncalibrated. A value in [0,1] is not evidence of calibration. See [calibration](calibration.md) for configuration, fitting records, and evaluation requirements.
+Both Noul parameter pairs default to slope 10 and intercept 0. CLM uses a true-minus-false difference for both Noul forms and configures slope 100. All mappings are uncalibrated. A value in [0,1] is not evidence of calibration. See [calibration](calibration.md) for configuration, fitting records, and evaluation requirements.
 
 ## Backend contract
 
@@ -175,7 +175,7 @@ class EmbeddingBackend(Protocol):
 
 An input carries `role`, `instruction`, and `text`. A batch carries vectors, token usage, and usage provenance. Model-specific rendering belongs in the adapter; the compiler and scorer remain independent of model libraries.
 
-The local backend uses `sentence_transformers.SentenceTransformer` to load repository-provided modules. It does not replace KaLM or Qwen3 pooling with a separate hand-written AutoModel pipeline. It accepts a local model directory or repository ID, revision, device, batch size, supported precision, and explicit remote-code trust. Loading is lazy; importing the core and compiling requests require no weights or GPU.
+The Sentence Transformers backend loads repository-provided modules, preserving KaLM and Qwen3-Embedding pooling. The paired-projection backend loads a base encoder and a two-head checkpoint, with pooling and prompts selected by configuration. Both accept local directories or repository IDs, device, precision, and explicit remote-code trust. Loading is lazy; importing the core and compiling requests require no weights or GPU.
 
 The HTTP backend connects to a compatible `/v1/embeddings` endpoint with a configured model, base URL, API-key environment variable, timeout, batch size, and retry limit. The client owns template rendering. The service must reject overlong input before the deployment declares `server_enforces_length: true`; the generic adapter does not implement client-side truncation or server-owned templates. Response indices restore vector order, and missing or duplicate indices are errors. Usage belongs to each call and is never stored as shared mutable `last_usage` state.
 
@@ -183,11 +183,11 @@ Custom Python backends can integrate other runtimes or fixed vectors for tests.
 
 ## Models, prompts, and loading
 
-The five delivered configurations are KaLM v2.5, Qwen3 0.6B, Qwen3 4B, Qwen3 8B, and multilingual E5 large instruct. Their repository IDs, dimensions, pooling, and limits are listed in the [README](../README.md#supported-models). All use the same four compilation paths. Changing the model does not require rewriting business questions or criteria.
+The delivered configurations are KaLM v2.5, Qwen3-Embedding 0.6B/4B/8B, multilingual E5 large instruct, and CLM v0.1-8B. Their repository IDs, dimensions, pooling, and limits are listed in the [README](../README.md#supported-models). Changing the model does not require rewriting business questions or criteria.
 
-KaLM uses repository-defined bidirectional attention and mean pooling. Qwen3 uses last-token pooling. E5 uses XLM-R and mean pooling. E5 accepts 512 tokens including prompts and special tokens; the other public configurations use a 32768-token limit. Adapter validation checks dimensions and loaded metadata.
+KaLM uses repository-defined bidirectional attention and mean pooling. Qwen3-Embedding uses last-token pooling. E5 uses XLM-R and mean pooling. CLM uses Qwen3-8B last-token pooling followed by 512-dimensional state/action projections. E5 accepts 512 tokens, CLM 2048, and the remaining public configurations use a 32768-token limit. Adapter validation checks dimensions and loaded metadata.
 
-Supported models use `include_prompt=true`. The backend renders complete strings and calls `encode(..., prompt="")` so default retrieval prompts cannot replace or duplicate original instructions. A model with excluded prompt tokens or structured instruction/text inputs requires a dedicated adapter. Text equality alone does not establish pooling equivalence.
+The Sentence Transformers models use `include_prompt=true`. That backend renders complete strings and calls `encode(..., prompt="")` so default retrieval prompts cannot replace or duplicate original instructions. CLM uses its configured raw-text encoder and projection heads.
 
 Remote code is disabled by default and explicitly enabled in the KaLM configuration. A load failure must not enable trust automatically. Remote-code trust does not install missing dependencies or resolve library incompatibilities. The tested library versions are recorded in the dependency constraints. Pin model and code revisions when supported; a weight revision alone must not be described as pinning independently referenced code. Unknown revisions remain unknown in diagnostics, with file hashes provided when available.
 
@@ -205,43 +205,23 @@ Usage counts only deduplicated inputs actually encoded. Cache hits are excluded.
 
 The Python API supports registration, evaluation, compilation inspection, traced evaluation, and cache clearing. The CLI accepts JSON input, repeated model configurations, output files, `--explain`, `--trace`, and `--serve`. Scoring and backend parameters belong in model configuration, not extra Jev question fields.
 
-The HTTP API provides `POST /v1/systemone` and `GET /v1/models`, binding to loopback by default. An explicitly enabled debug route exposes compilation. Validation failures return 422 and backend failures return 502. Requests fail atomically without partial answers. Retries are bounded and apply only to transient failures. See [compatibility](compatibility.md) for unverified SDK boundaries.
+The HTTP API provides `POST /v1/systemone` and `GET /v1/models`, binding to loopback by default. An explicitly enabled debug route exposes compilation. Validation failures return 422 and backend failures return 502. Requests fail atomically without partial answers. Retries are bounded and apply only to transient failures. See [compatibility](compatibility.md) for SDK boundaries.
 
 ## Source layout
 
 | Component | Responsibility |
 | --- | --- |
-| `schemas.py`, `serialization.py` | Request validation and deterministic JSON |
+| `schemas.py`, `serialization.py` | Request validation and configurable text serialization |
 | `compiler.py`, `prompts.py` | Task plans and rendered model inputs |
 | `config.py`, `client.py` | Configuration, registration, evaluation, and usage |
 | `backends/` | Local, HTTP, and custom backend contracts |
 | `scoring.py`, `cache.py` | Probability mappings, confidence, and bounded caching |
 | `server.py`, `cli.py` | HTTP and command-line interfaces |
 | `configs/`, `examples/` | Portable configurations and shared task examples |
-| `tests/`, `reports/` | Fixtures, automated checks, and published validation results |
+| `tests/`, `reports/` | Regression tests and published benchmark results |
 
 Core dependencies remain lightweight. Local inference, HTTP clients, and servers have separate optional dependency groups.
 
-## Validation contract
+## Examples and benchmark results
 
-Validation separates contract correctness, model integration, and semantic observations. Fixed vectors can verify formulas and fields but cannot establish model decision quality.
-
-Automated checks cover exact input mappings; both Noul paths; unchanged instructions and question-ID independence; null and structured criteria; nonempty Choice criteria, large candidate sets, and ties; Score indices and legends; mixed-question independence; stable probability formulas; finite parameters and vectors; Unicode; length policies; model aliases; cache isolation; concurrency and usage; HTTP response indices, retries, and errors; matching Python and HTTP fields; lazy imports; and CLI operation.
-
-Real-model validation records revisions or explicit unknown status, artifact hashes, templates, scoring settings, raw cosine values, outputs, device, precision, dependencies, timing, and usage provenance. Single-question and mixed-question Noul runs are compared with an explicit tolerance. Length validation must prove acceptance at the limit, rejection above it, and reported truncation when enabled.
-
-### Official fixtures
-
-The original requests and reference responses are retained separately under `tests/fixtures/`:
-
-| Fixture stem | Source | Required observations |
-| --- | --- | --- |
-| `official_choice_exchange` | [Choice](https://docs.typesafe.ai/primitives/choice) | Exact named documents; all candidate probabilities; selected argmax; record whether the model selects returns |
-| `official_score_safari` | [Score](https://docs.typesafe.ai/primitives/score) | Unnumbered documents; complete string-keyed legend; expected score; record the ranking of levels 1 and 2 relative to 0 |
-| `official_noul_escalation` | [Noul](https://docs.typesafe.ai/primitives/noul) | Both paths in one request; finite Noul values; compare individual and mixed execution |
-
-Only the request model changes during JevEmbed evaluation. Original reference JSON remains unchanged. The Score reference satisfies `0 * 0.0 + 1 * 0.57 + 2 * 0.43 = 1.43`; JevEmbed is not required to reproduce that value or official probabilities, confidence, or usage.
-
-These three requests cover four questions and four compilation paths for each model. They are smoke tests, not an accuracy benchmark. Calibration fitting and generalization evaluation require separate labeled data.
-
-See the [JevBench public evaluation](../reports/JEVBENCH_PUBLIC.md) for measured accuracy, calibration, latency, and limitations. Future work includes calibration fitting, reliability plots, larger labeled evaluations, and additional dedicated adapters.
+The [shared examples](../examples/README.md) show Choice, Score, and both Noul forms. The [JevBench public evaluation](../reports/JEVBENCH_PUBLIC.md) reports model accuracy, calibration, latency, and scope.

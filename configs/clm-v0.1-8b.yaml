@@ -1,0 +1,40 @@
+model_id: clm-v0.1-8b
+backend: paired_projection
+model_name_or_path: Qwen/Qwen3-8B
+revision: b968826d9c46dd6066d109eabc6255188de91218
+projection_name_or_path: Contrastive-LM/CLM-v0.1-8B
+projection_filename: CLM_v0.1-8B.pt
+projection_revision: 87655cb835bd76fd66c2da78e1e3709f7fa11a94
+aliases: [Contrastive-LM/CLM-v0.1-8B]
+trust_remote_code: false
+local_files_only: false
+device: auto
+dtype: auto
+batch_size: 2
+pooling: last_token
+normalize_embeddings: true
+expected_dimension: 512
+max_input_tokens: 2048
+overflow_policy: truncate
+query_truncation_side: left
+document_truncation_side: right
+attention_implementation: sdpa
+prompts:
+  query_template: "{text}\n\n{instruction}"
+  document_template: "{text}"
+  serialization_mode: prose
+  choice_candidate_template: "{text}"
+  choice_empty_uses_label: true
+  noul_input_mapping: binary_candidates
+  noul_candidate_template: "{label}: {text}"
+  noul_true_fallback: "Yes. This is true: {instruction}"
+  noul_false_fallback: "No. This is false: {instruction}"
+  strip_rendered: true
+  version: clm-v0.1
+scoring:
+  choice_temperature: 0.01
+  score_temperature: 0.01
+  noul_with_criteria: {slope: 100.0, intercept: 0.0}
+  noul_without_criteria: {slope: 100.0, intercept: 0.0}
+  confidence: top_margin
+  calibration_status: uncalibrated

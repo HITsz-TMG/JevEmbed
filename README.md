@@ -61,28 +61,19 @@ The provided configurations use Hugging Face repository IDs. Weights are downloa
 | `qwen3-embedding-4b` | `Qwen/Qwen3-Embedding-4B` | 2560 | 32768 | Last-token |
 | `qwen3-embedding-8b` | `Qwen/Qwen3-Embedding-8B` | 4096 | 32768 | Last-token |
 | `multilingual-e5-large-instruct` | `intfloat/multilingual-e5-large-instruct` | 1024 | 512 | Mean |
+| `clm-v0.1-8b` | `Contrastive-LM/CLM-v0.1-8B` projection heads + `Qwen/Qwen3-8B` encoder | 512 | 2048 | Last-token + paired heads |
 
 Configurations are stored in `configs/<model-id>.yaml`. Each full repository ID is registered as an alias, while responses use the canonical short ID. Unknown model IDs are rejected. `jev-latest` is not registered automatically.
 
-KaLM explicitly enables `trust_remote_code: true` to load its repository-provided Python implementation. Qwen3 and E5 use `false`. A loading failure never enables trust or changes pooling automatically. Pin a revision and preserve dependency and template versions when reproducing results.
+KaLM explicitly enables `trust_remote_code: true` to load its repository-provided Python implementation. Qwen3, E5, and CLM use `false`. A loading failure never enables trust or changes pooling automatically. Pin a revision and preserve dependency and template versions when reproducing results.
 
-Qwen3-Embedding-8B was verified with Choice, Score, and Noul example requests on CUDA BF16 using the tested dependency versions. Its public-subset JevBench result is included below.
+CLM uses a separate state/action projection pair and a [model-specific prompt configuration](configs/clm-v0.1-8b.yaml). Its Choice/Score temperature is 0.01 and its Noul slope is 100, matching the checkpoint's capped logit scale. The other configurations retain their existing prompts and scoring defaults. See the [CLM guide](docs/clm.md) for setup.
 
 ## Quick start
 
 ```bash
-# Inspect the compiled inputs without loading weights
-python -m jevembed --config configs/kalm-embedding-v2.5.yaml \
-  --input examples/official_noul_escalation.json --explain
-
-# Run inference and print a standard JSON response
 python -m jevembed --config configs/kalm-embedding-v2.5.yaml \
   --input examples/official_choice_exchange.json
-
-# Save the response and a separate diagnostic trace
-mkdir -p artifacts
-python -m jevembed --config configs/kalm-embedding-v2.5.yaml \
-  --input examples/official_noul_escalation.json --trace --output artifacts/noul-trace.json
 ```
 
 Repeat `--config` to register multiple models. When switching models, also change the request's `model` field. `--input -` reads JSON from standard input; output goes to standard output unless a file is specified.
@@ -133,7 +124,7 @@ Small numerical differences can occur with different hardware, precision, or mod
 
 Reference outputs are taken from the saved Jev documentation examples, rather than new API calls. Both columns contain model predictions, not independently annotated ground truth. These examples illustrate API behavior and do not constitute an accuracy benchmark.
 
-The same requests were run on all five supported models with CUDA BF16; see the [example results](examples/README.md).
+The same requests were run on all supported models with CUDA BF16; see the [example results](examples/README.md).
 
 ### Choice: route an exchange request
 
@@ -528,7 +519,7 @@ Original requests and reference responses are stored in `tests/fixtures/`. Save 
 
 ## JevBench public-subset results
 
-These runs use the shipped configurations, Choice/Score temperature **0.1**, Noul slope **10**, and BF16. Accuracy covers **231 public tasks**, not the full JevBench leaderboard.
+These runs use the shipped configurations and BF16. The five Sentence Transformers models use Choice/Score temperature **0.1** and Noul slope **10**; CLM uses **0.01** and **100**, matching its projection checkpoint. Accuracy covers **231 public tasks**, not the full JevBench leaderboard.
 
 | Model | Easy (48) | Standard (72) | Hard (111) | Overall (231) |
 | --- | ---: | ---: | ---: | ---: |
@@ -536,12 +527,13 @@ These runs use the shipped configurations, Choice/Score temperature **0.1**, Nou
 | `Qwen/Qwen3-Embedding-0.6B` | 93.75% (45/48) | 61.11% (44/72) | 36.94% (41/111) | 56.28% (130/231) |
 | `Qwen/Qwen3-Embedding-4B` | 89.58% (43/48) | 62.50% (45/72) | 39.64% (44/111) | 57.14% (132/231) |
 | `Qwen/Qwen3-Embedding-8B` | 93.75% (45/48) | 69.44% (50/72) | 36.04% (40/111) | **58.44% (135/231)** |
+| `Contrastive-LM/CLM-v0.1-8B` | 68.75% (33/48) | 34.72% (25/72) | 35.14% (39/111) | 41.99% (97/231) |
 | `intfloat/multilingual-e5-large-instruct` (default) | 95.83% (46/48) | 55.56% (40/72) | 27.03% (30/111) | 50.22% (116/231) |
 | `intfloat/multilingual-e5-large-instruct` (explicit truncation) | 95.83% (46/48) | 55.56% (40/72) | 36.04% (40/111) | 54.55% (126/231) |
 
-E5's default 512-token limit rejects 53 Hard tasks, which count as incorrect. The supplemental truncation run processes those inputs at 512 tokens. All other runs return valid answers without truncation.
+E5's default 512-token limit rejects 53 Hard tasks, which count as incorrect. The supplemental truncation run processes those inputs at 512 tokens. CLM returns valid answers for all tasks, with at least one input truncated on 36 tasks under its 2048-token limit. KaLM and the Qwen3 embedding models return valid answers without truncation.
 
-The [JevBench public evaluation](reports/JEVBENCH_PUBLIC.md) compares the five evaluated models under these settings, with task-type accuracy, calibration, and latency. Aggregated metrics and evaluation settings are available in [JSON format](reports/jevbench-public.json).
+The [JevBench public evaluation](reports/JEVBENCH_PUBLIC.md) reports task-type accuracy, calibration, and latency. The [embedding-model metrics](reports/jevbench-public.json) and [CLM metrics](reports/clm-v0.1-8b-public.json) are available in JSON.
 
 See the [compatibility boundaries](docs/compatibility.md) and [architecture and design](docs/design.md) for the implementation contract.
 

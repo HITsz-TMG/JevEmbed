@@ -4,15 +4,15 @@
 
 ## Model encoding
 
-The local backend loads repository modules through SentenceTransformer, preserving attention and pooling. Supported models use `include_prompt=true`; `encode(rendered_texts, prompt="")` prevents automatic prompts from replacing or duplicating instructions. Other pooling conventions or structured model inputs require a dedicated adapter.
+The Sentence Transformers backend loads repository modules, preserving their attention and pooling. Those models use `include_prompt=true`; `encode(rendered_texts, prompt="")` prevents automatic prompts from replacing or duplicating instructions. The paired-projection backend encodes raw text with a base model and routes query and candidate vectors through separate checkpointed heads. Its prompts and pooling are configured per model.
 
 ## Device, precision, and length limits
 
-`device: auto` prefers CUDA and otherwise uses CPU. `dtype: auto` selects bfloat16 on supported CUDA devices and float32 on CPU. E5's 512-token limit includes instructions, content, and special tokens; the other supported configurations use 32768. Overlong inputs fail by default. Explicit `overflow_policy: truncate` enables truncation, recorded in the trace, including cache hits.
+`device: auto` prefers CUDA and otherwise uses CPU. `dtype: auto` selects bfloat16 on supported CUDA devices and float32 on CPU. E5 uses a 512-token limit, CLM uses 2048, and the other supported configurations use 32768. Overlong inputs fail by default. Explicit `overflow_policy: truncate` enables truncation, recorded in the trace, including cache hits; CLM's configuration enables it with role-specific truncation sides.
 
 ## Caching
 
-The in-memory LRU cache defaults to 4096 entries. Cache identity includes the model, revision, templates, encoding settings, and loaded model metadata. Cache access is locked per model. The built-in local backend serializes model encoding for thread safety; requests may overlap outside encoding. The built-in HTTP embedding backend permits concurrent encoding. Unknown custom backends retain whole-request serialization. Concurrent requests may encode the same uncached input more than once; usage reports each request's actual work. Create a new client after changing model weights or configuration.
+The in-memory LRU cache defaults to 4096 entries. Cache identity includes the model, revision, templates, encoding settings, and loaded model metadata. Cache access is locked per model. The built-in local backends serialize model encoding for thread safety; requests may overlap outside encoding. The built-in HTTP embedding backend permits concurrent encoding. Unknown custom backends retain whole-request serialization. Concurrent requests may encode the same uncached input more than once; usage reports each request's actual work. Create a new client after changing model weights or configuration.
 
 ## Token usage
 

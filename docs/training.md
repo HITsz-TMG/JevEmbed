@@ -1,6 +1,6 @@
 # LoRA training for Jev tasks
 
-JevEmbed fine-tunes a shared embedding encoder with Sentence Transformers and PEFT. The input compiler, prompts, pooling, and scoring match inference. Only LoRA parameters are updated; the base weights remain frozen. This implementation supports one CPU or one visible CUDA device per process.
+JevEmbed fine-tunes Sentence Transformers embedding encoders with PEFT. The input compiler, prompts, pooling, and scoring match inference for those models. Only LoRA parameters are updated; the base weights remain frozen. This implementation supports one CPU or one visible CUDA device per process. CLM's paired-projection backend is currently inference-only.
 
 ## Install
 

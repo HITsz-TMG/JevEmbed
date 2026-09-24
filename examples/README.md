@@ -19,8 +19,9 @@ The following example predictions use the shipped configurations, CUDA BF16, and
 | Qwen3 4B | 0.562020 | 0.979632 | 0.999852 | 0.699510 |
 | Qwen3 8B | 0.460480 | 1.226909 | 0.999863 | 0.680314 |
 | E5 large instruct | 0.439349 | 1.096561 | 0.999778 | 0.627429 |
+| CLM v0.1-8B | 0.949643 | 0.845996 | 0.691813 | 0.971412 |
 
-All five models select `returns` for Choice. The full KaLM CPU FP32 responses and Jev reference outputs appear in the [main README](../README.md#official-jev-examples-with-kalm-results). Small differences are possible with another device, precision, or model revision.
+All models select `returns` for Choice. CLM uses its own [prompt and projection configuration](../docs/clm.md). The full KaLM CPU FP32 responses and Jev reference outputs appear in the [main README](../README.md#official-jev-examples-with-kalm-results). Small differences are possible with another device, precision, or model revision.
 
 Run this example from the project root:
 
@@ -34,7 +35,6 @@ with open("examples/official_noul_escalation.json", encoding="utf-8") as handle:
 request["model"] = config.model_id
 
 client = JevEmbed(config=config)
-print(client.explain(request))  # Inspect compiled inputs without loading weights
 print(client.evaluate(request))
 ```
 
