@@ -8,6 +8,10 @@
 
 JevEmbed is a Python framework for embedding-based Choice, Score, and Noul decisions. It provides a Python API, CLI, and optional HTTP server using Jev-style request and response schemas. JevEmbed is an independent implementation.
 
+## News
+
+- **September 24, 2026:** [JevEmbed-Data](https://huggingface.co/datasets/HIT-TMG/JevEmbed-Data) is available for fine-tuning, with 1.67 million labeled Choice, Score, and Noul questions.
+
 ## Installation
 
 Use Python 3.10–3.12 for the tested model stack. Run these commands from the project root:
