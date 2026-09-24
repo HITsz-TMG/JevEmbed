@@ -11,7 +11,7 @@ from ..prompts import PromptAdapter
 from ..schemas import validate_request
 from ..serialization import serialize, validate_json
 
-PATHS = ("choice", "score", "noul_criteria", "noul_similarity")
+PATHS = ("choice", "score", "noul_with_criteria", "noul_without_criteria")
 
 
 @dataclass

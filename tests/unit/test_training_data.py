@@ -3,7 +3,7 @@ from dataclasses import replace
 
 import pytest
 
-from jevembed import JevEmbed, ModelConfig, PromptConfig, ValidationError
+from jevembed import JevEmbed, ModelConfig, ValidationError
 from jevembed.training.data import check_disjoint, load_examples
 from jevembed.training.run import TrainingConfig
 
@@ -56,7 +56,7 @@ def test_noul_and_split_leakage(tmp_path):
     row["request"]["questions"]["q"] = {"type":"noul", "instructions":"meaning"}
     row["answers"]["q"] = {"noul": False}
     e = read(tmp_path,[row])[0]
-    assert e.target == [0] and e.plan.path == "noul_similarity"
+    assert e.target == [0] and e.plan.path == "noul_without_criteria"
     assert all(t.startswith("Instruct: Retrieve semantically similar text.") for t in e.texts)
     with pytest.raises(ValidationError,match="state/question"):
         check_disjoint([e],[replace(e,record_id="different")])
@@ -64,16 +64,17 @@ def test_noul_and_split_leakage(tmp_path):
         check_disjoint([replace(e,group="g")],[replace(e,record_id="other",fingerprint="other",group="g")])
 
 
-def test_unified_noul_training_matches_inference(tmp_path):
+def test_noul_with_criteria_training_matches_inference(tmp_path):
     row = record()
-    row["request"]["questions"]["q"] = {"type": "noul", "instructions": "meaning"}
+    row["request"]["questions"]["q"] = {"type": "noul", "instructions": "meaning",
+                                         "criteria": {"true": "yes", "false": "no"}}
     row["answers"]["q"] = {"noul": True}
     path = tmp_path / "noul.jsonl"
     path.write_text(json.dumps(row))
-    config = ModelConfig(model_id="test", prompts=PromptConfig(noul_format="unified"))
+    config = ModelConfig(model_id="test")
     example = load_examples(path, config)[0]
     trace = JevEmbed(config=config, backend=object()).explain(row["request"])
-    assert example.plan.path == "noul_criteria"
+    assert example.plan.path == "noul_with_criteria"
     assert example.target == [1]
     assert example.texts == [item["rendered"] for item in trace["tasks"][0]["inputs"]]
     assert len(example.texts) == 3

@@ -14,9 +14,8 @@ usage_mode: strict
 prompts:
   query_template: "Instruct: {instruction}\nQuery: {text}"
   document_template: "{text}"
-  noul_format: retrieval
 scoring:
   choice_temperature: 0.1
   score_temperature: 0.1
-  noul_criteria: {slope: 10.0, intercept: 0.0}
-  noul_similarity: {slope: 10.0, intercept: 0.0}
+  noul_with_criteria: {slope: 10.0, intercept: 0.0}
+  noul_without_criteria: {slope: 10.0, intercept: 0.0}

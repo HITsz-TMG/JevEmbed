@@ -27,12 +27,14 @@ def test_official_compilation(client, fixtures):
     assert [i["rendered"] for i in s[1:]] == score["questions"]["bug_severity"]["criteria"]
     n = client.explain(noul)["tasks"]
     assert [i["rendered"] for i in n[0]["inputs"]] == [
-        "Instruct: Retrieve semantically similar text.\nQuery: I have asked three times now. Can I please just talk to a real person?",
-        "Instruct: Retrieve semantically similar text.\nQuery: Is the customer asking for a human agent?"]
+        "Instruct: Retrieve semantically similar text.\nQuery: Is the customer asking for a human agent?",
+        "Instruct: Retrieve semantically similar text.\nQuery: I have asked three times now. Can I please just talk to a real person?"]
     assert all(i["role"] == "query" for i in n[0]["inputs"])
     assert [i["rendered"] for i in n[1]["inputs"]] == [
-        "Instruct: Has the customer contacted support about this before?\nQuery: I have asked three times now. Can I please just talk to a real person?",
-        "Mentions a prior attempt, ticket, or that they have asked before", "No sign of any previous contact"]
+        "Instruct: Retrieve semantically similar text.\nQuery: Has the customer contacted support about this before?\nI have asked three times now. Can I please just talk to a real person?",
+        "Instruct: Retrieve semantically similar text.\nQuery: true: Mentions a prior attempt, ticket, or that they have asked before",
+        "Instruct: Retrieve semantically similar text.\nQuery: false: No sign of any previous contact"]
+    assert all(i["role"] == "query" for i in n[1]["inputs"])
 
 
 def test_official_reference():
@@ -101,42 +103,23 @@ def test_score_expectation_and_legend(client):
 
 def test_noul_parameters_and_order():
     cfg = ModelConfig(model_id="test", backend="custom", scoring=ScoringConfig(
-        noul_criteria=LogisticConfig(2, -1), noul_similarity=LogisticConfig(3, -2)))
-    c = JevEmbed(config=cfg, backend=FixedBackend({"state": [1, 0], "yes": [1, 0], "no": [0, 1], "instruction": [1, 0]}))
+        noul_with_criteria=LogisticConfig(2, -1), noul_without_criteria=LogisticConfig(3, -2)))
+    c = JevEmbed(config=cfg, backend=FixedBackend({"instruction\nstate": [1, 0], "true: yes": [1, 0],
+                                                  "false: no": [0, 1], "state": [1, 0], "instruction": [1, 0]}))
     r = request("noul", {"false": "no", "true": "yes"})
     assert c.evaluate(r)["answers"]["q"] == {"type": "noul", "noul": sigmoid(1)}
-    assert [i["text"] for i in c.explain(r)["tasks"][0]["inputs"]][1:] == ["yes", "no"]
+    assert [i["text"] for i in c.explain(r)["tasks"][0]["inputs"]][1:] == ["true: yes", "false: no"]
     assert c.evaluate(request("noul"))["answers"]["q"]["noul"] == sigmoid(1)
 
 
-def test_unified_noul_uses_one_query_and_true_false_documents():
-    prompts = PromptConfig(noul_format="unified")
-    cfg = ModelConfig(model_id="test", backend="custom", prompts=prompts,
-                      scoring=ScoringConfig(noul_criteria=LogisticConfig(2, 0)))
-    backend = FixedBackend({"state": [1, 0], "The answer to the question is yes.": [1, 0],
-                            "The answer to the question is no.": [0, 1],
-                            "yes": [1, 0], "no": [0, 1]})
-    client = JevEmbed(config=cfg, backend=backend)
-    for criteria, expected_texts in [(None, ["The answer to the question is yes.",
-                                              "The answer to the question is no."]),
-                                     ({"false": "no", "true": "yes"}, ["yes", "no"])]:
-        task = request("noul", criteria)
-        trace = client.explain(task)["tasks"][0]
-        assert trace["path"] == "noul_criteria"
-        assert [item["role"] for item in trace["inputs"]] == ["query", "document", "document"]
-        assert trace["inputs"][0]["rendered"] == "Instruct: instruction\nQuery: state"
-        assert [item["rendered"] for item in trace["inputs"][1:]] == expected_texts
-        assert client.evaluate(task)["answers"]["q"] == {"type": "noul", "noul": sigmoid(2)}
-
-
-def test_retrieval_noul_uses_fixed_instruction_for_all_queries():
-    config = ModelConfig(model_id="test", backend="custom", prompts=PromptConfig(noul_format="retrieval"))
-    backend = FixedBackend({"state": [1, 0], "instruction": [.8, .6],
-                            "instruction\nyes": [.8, .6], "instruction\nno": [0, 1]})
+def test_noul_input_mapping():
+    config = ModelConfig(model_id="test", backend="custom")
+    backend = FixedBackend({"state": [1, 0], "instruction": [.8, .6], "instruction\nstate": [1, 0],
+                            "true: yes": [.8, .6], "false: no": [0, 1]})
     client = JevEmbed(config=config, backend=backend)
     without = request("noul")
     task = client.explain(without)["tasks"][0]
-    assert task["path"] == "noul_similarity"
+    assert task["path"] == "noul_without_criteria"
     assert [item["role"] for item in task["inputs"]] == ["query", "query"]
     assert [item["rendered"] for item in task["inputs"]] == [
         "Instruct: Retrieve semantically similar text.\nQuery: instruction",
@@ -145,29 +128,39 @@ def test_retrieval_noul_uses_fixed_instruction_for_all_queries():
 
     with_criteria = request("noul", {"false": "no", "true": "yes"})
     task = client.explain(with_criteria)["tasks"][0]
-    assert task["path"] == "noul_criteria"
+    assert task["path"] == "noul_with_criteria"
     assert [item["role"] for item in task["inputs"]] == ["query", "query", "query"]
     assert [item["rendered"] for item in task["inputs"]] == [
-        "Instruct: Retrieve semantically similar text.\nQuery: state",
-        "Instruct: Retrieve semantically similar text.\nQuery: instruction\nyes",
-        "Instruct: Retrieve semantically similar text.\nQuery: instruction\nno"]
+        "Instruct: Retrieve semantically similar text.\nQuery: instruction\nstate",
+        "Instruct: Retrieve semantically similar text.\nQuery: true: yes",
+        "Instruct: Retrieve semantically similar text.\nQuery: false: no"]
     assert client.evaluate(with_criteria)["answers"]["q"]["noul"] == pytest.approx(sigmoid(8))
 
 
-def test_invalid_noul_format():
-    with pytest.raises(ValidationError, match="noul_format"):
-        PromptConfig(noul_format="unknown")
+@pytest.mark.parametrize("old_format", ["legacy", "unified", "unknown"])
+def test_old_noul_formats_are_rejected(old_format):
+    with pytest.raises(ValidationError, match="noul_format only supports retrieval"):
+        ModelConfig.from_dict({"prompts": {"noul_format": old_format}})
+
+
+def test_saved_retrieval_config_and_old_scoring_keys_load():
+    config = ModelConfig.from_dict({"prompts": {"noul_format": "retrieval"}, "scoring": {
+        "noul_criteria": {"slope": 4, "intercept": 1},
+        "noul_similarity": {"slope": 3, "intercept": -1}}})
+    assert config.prompts == PromptConfig()
+    assert config.scoring.noul_with_criteria == LogisticConfig(4, 1)
+    assert config.scoring.noul_without_criteria == LogisticConfig(3, -1)
 
 
 def test_shipped_scoring_defaults_match_python_api():
     expected = ScoringConfig()
     assert expected.choice_temperature == expected.score_temperature == 0.1
-    assert expected.noul_criteria == expected.noul_similarity == LogisticConfig(10.0, 0.0)
+    assert expected.noul_with_criteria == expected.noul_without_criteria == LogisticConfig(10.0, 0.0)
     for name in ("kalm-embedding-v2.5", "qwen3-embedding-0.6b", "qwen3-embedding-4b", "qwen3-embedding-8b",
                  "multilingual-e5-large-instruct", "http-example"):
         config = ModelConfig.load(ROOT / "configs" / f"{name}.yaml")
         assert config.scoring == expected
-        assert config.prompts.noul_format == "retrieval"
+        assert config.prompts == PromptConfig()
 
 
 @pytest.mark.parametrize("kind,criteria", [("choice", {}), ("choice", []), ("choice", {"a": 3}),

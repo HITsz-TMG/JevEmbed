@@ -23,7 +23,7 @@ prompts:
 scoring:
   choice_temperature: 0.1
   score_temperature: 0.1
-  noul_criteria: {slope: 10.0, intercept: 0.0}
-  noul_similarity: {slope: 10.0, intercept: 0.0}
+  noul_with_criteria: {slope: 10.0, intercept: 0.0}
+  noul_without_criteria: {slope: 10.0, intercept: 0.0}
   confidence: normalized_entropy
   calibration_status: uncalibrated

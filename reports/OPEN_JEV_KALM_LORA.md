@@ -13,17 +13,14 @@ KaLM v2.5 was fine-tuned for one epoch on [ZefanCai/Open-Jev](https://huggingfac
 
 Overall hard-label accuracy pools correct Choice, Score, and Noul predictions across 740 + 470 + 2,285 questions. The remaining 228 validation questions have soft targets or expected Score values and are excluded from this accuracy.
 
-The same base model and saved adapters were evaluated on all 231 public JevBench tasks with the [current KaLM configuration](../configs/kalm-embedding-v2.5.yaml): the updated Noul encoding (state and each `instructions + criterion` encoded as queries), Choice/Score temperature 0.1, Noul slopes 10, and the model's native input limit. Accuracy is the public-suite aggregate, not an official full-benchmark score.
+The base model and final adapter were also evaluated on all 231 public JevBench tasks with the [current KaLM configuration](../configs/kalm-embedding-v2.5.yaml), BF16, and the model's native input limit. All tasks returned valid answers.
 
-| Training step | Overall accuracy | Change vs. base | Choice | Score | Noul |
-| ---: | ---: | ---: | ---: | ---: | ---: |
-| 0 (base) | 52.38% | — | 49.64% | 61.11% | 55.41% |
-| 100 | 52.81% | +0.43 pp | 49.64% | 61.11% | 56.76% |
-| 200 | 54.98% | +2.60 pp | 51.08% | 77.78% | 56.76% |
-| 300 | 54.55% | +2.16 pp | 52.52% | 72.22% | 54.05% |
-| 400 | 56.28% | +3.90 pp | 53.96% | 77.78% | 55.41% |
-| 500 | 56.28% | +3.90 pp | 54.68% | 77.78% | 54.05% |
-| 600 | 56.71% | +4.33 pp | 54.68% | 77.78% | 55.41% |
-| 619 (final) | 55.41% | +3.03 pp | 53.24% | 77.78% | 54.05% |
+| JevBench metric | Base | Final adapter |
+| --- | ---: | ---: |
+| Overall accuracy | 51.52% (119/231) | 54.11% (125/231) |
+| Choice accuracy | 49.64% (69/139) | 53.24% (74/139) |
+| Score accuracy | 61.11% (11/18) | 77.78% (14/18) |
+| Noul accuracy | 52.70% (39/74) | 50.00% (37/74) |
+| Score expected-level MAE (lower is better) | 0.697 | 0.564 |
 
-All 231 tasks returned valid answers at each step. Step 600 had the highest observed public accuracy, but checkpoint selection on this same public subset is exploratory. Open-Jev Noul training rows have no criteria, while all 74 public JevBench Noul tasks supply criteria. The criteria-free legacy and retrieval encodings have the same cosine mathematically; the criteria-based JevBench path tests transfer to a different input mapping.
+The public-subset overall gain is 2.60 percentage points. These results are not an official full-benchmark score.

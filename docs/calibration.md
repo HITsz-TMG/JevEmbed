@@ -13,14 +13,14 @@ confidence = 1 - entropy(p) / log(K)
 
 Temperature must be finite and positive. Lower temperatures concentrate probability on higher similarities; they do not change their ranking. Score can change as probability shifts between levels. There is no rounding or ordinal smoothing. Confidence measures distribution concentration, not correctness; for K=1 it is defined as 1. It is not claimed to match Jev's confidence formula.
 
-The shipped models use the fixed retrieval instruction and query-role embeddings for both Noul forms:
+Both Noul forms use the retrieval instruction and query-role embeddings:
 
 ```text
-with criteria:    sigmoid(a_criteria * (cos(q_state, q_question_true) - cos(q_state, q_question_false)) + b_criteria)
-without criteria: sigmoid(a_similarity * cos(q_question, q_state) + b_similarity)
+with criteria:    sigmoid(a_with * (cos(q_question_state, q_true_criterion) - cos(q_question_state, q_false_criterion)) + b_with)
+without criteria: sigmoid(a_without * cos(q_question, q_state) + b_without)
 ```
 
-In the criteria path, each `q_question_*` encodes the original instructions, a newline, and one criterion; the fixed retrieval instruction prefixes all three queries. Choice/Score temperatures do not affect Noul. With the default Noul parameters, the true/false difference maps to approximately [0.000000002, 0.999999998], while a single cosine maps to [0.000045, 0.999955]. These are theoretical bounds; real embeddings may occupy a narrower range. The optional `legacy` and `unified` mappings remain available for existing adapters. A positive similarity producing an output above 0.5 is not evidence of understanding a proposition. Negation, mention, and actual requests need separate labeled evaluation.
+In the criteria path, `q_question_state` joins the original instructions and state with a newline; each criterion query begins with `true: ` or `false: `. The fixed retrieval instruction prefixes all three queries. Choice/Score temperatures do not affect Noul. With the default Noul parameters, the true/false difference maps to approximately [0.000000002, 0.999999998], while a single cosine maps to [0.000045, 0.999955]. These are theoretical bounds; real embeddings may occupy a narrower range. A positive similarity producing an output above 0.5 is not evidence of understanding a proposition. Negation, mention, and actual requests need separate labeled evaluation.
 
 Configurations can load externally fitted parameters:
 
@@ -28,8 +28,8 @@ Configurations can load externally fitted parameters:
 scoring:
   choice_temperature: 0.15
   score_temperature: 0.2
-  noul_criteria: {slope: 5.0, intercept: -0.2}
-  noul_similarity: {slope: 4.0, intercept: -2.0}
+  noul_with_criteria: {slope: 5.0, intercept: -0.2}
+  noul_without_criteria: {slope: 4.0, intercept: -2.0}
   calibration_status: externally_fitted
   calibration_record:
     model_revision: exact-commit-or-artifact-sha256

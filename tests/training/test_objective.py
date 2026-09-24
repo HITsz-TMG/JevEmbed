@@ -8,10 +8,10 @@ from jevembed.training.objective import JevCollator, JevLoss, task_loss
 
 
 @pytest.mark.parametrize("path,mode,target", [("choice",0,[1,0]),("score",0,[.2,.8]),
-                                            ("score",1,[.4]),("noul_criteria",2,[1]),("noul_similarity",2,[0])])
+                                            ("score",1,[.4]),("noul_with_criteria",2,[1]),("noul_without_criteria",2,[0])])
 def test_loss_matches_inference_math_and_backprop(path,mode,target):
     vectors=torch.tensor([[1.,0.],[.6,.8],[0.,1.]],requires_grad=True)
-    if path=="noul_similarity":vectors=vectors[:2]
+    if path=="noul_without_criteria":vectors=vectors[:2]
     scoring=ScoringConfig()
     loss=task_loss(vectors,path,mode,torch.tensor(target),scoring)
     probs=softmax([.6,0],getattr(scoring,f"{path}_temperature",scoring.choice_temperature))
@@ -39,7 +39,7 @@ def test_groups_do_not_create_cross_request_negatives():
     batch=JevCollator(model)(rows)
     loss=JevLoss(model,ScoringConfig())([{"input_ids":batch["sentence_input_ids"]}],batch["label"])
     expected=(task_loss(model.v[:3],"choice",0,torch.tensor([1.,0.]),ScoringConfig())+
-              task_loss(model.v[3:],"noul_similarity",2,torch.tensor([.3]),ScoringConfig()))/2
+              task_loss(model.v[3:],"noul_without_criteria",2,torch.tensor([.3]),ScoringConfig()))/2
     assert loss.item()==pytest.approx(expected.item())
     loss.backward()
     assert model.v.grad is not None

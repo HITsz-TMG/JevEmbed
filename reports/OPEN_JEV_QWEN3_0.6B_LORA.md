@@ -17,10 +17,10 @@ The base model and final adapter were also evaluated on all 231 public JevBench 
 
 | JevBench metric | Base | Final adapter |
 | --- | ---: | ---: |
-| Overall accuracy | 54.55% (126/231) | 50.65% (117/231) |
+| Overall accuracy | 56.28% (130/231) | 55.84% (129/231) |
 | Choice accuracy | 56.12% (78/139) | 58.99% (82/139) |
 | Score accuracy | 50.00% (9/18) | 38.89% (7/18) |
-| Noul accuracy | 52.70% (39/74) | 37.84% (28/74) |
+| Noul accuracy | 58.11% (43/74) | 54.05% (40/74) |
 | Score expected-level MAE (lower is better) | 0.579 | 0.645 |
 
-The validation gain did not carry over to the public JevBench total. Open-Jev Noul training rows have no criteria, whereas all 74 public JevBench Noul tasks provide true/false criteria; this difference may contribute to the Noul regression. These are public-subset results, not an official full-benchmark score.
+The validation gain did not carry over to the public JevBench total, which changed by −0.43 percentage points. These are public-subset results, not an official full-benchmark score.

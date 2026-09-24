@@ -21,7 +21,7 @@ def test_mapping_preserves_soft_labels_without_metadata(kind, tmp_path):
     e=load_examples(p,ModelConfig())[0]
     assert all("privileged" not in t and "never send" not in t for t in e.texts)
     if kind=='noul':
-        assert e.target==[.75] and e.plan.path=='noul_similarity'
+        assert e.target==[.75] and e.plan.path=='noul_without_criteria'
     else:
         assert e.target==[.25,.75] and e.texts[1:]==source['options']
     changed=deepcopy(source);changed['metadata']['privileged']='something else'

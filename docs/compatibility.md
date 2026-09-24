@@ -9,7 +9,7 @@ JevEmbed v0.1 implements Jev-shaped JSON contracts. The original implementation 
 | Choice | One or more candidates, with no fixed count limit; null descriptions encode the name alone; ties follow request order. Large candidate sets increase inference work and memory use |
 | Score | 2–10 levels; level numbers are excluded from encoded text; full distribution with string numeric keys |
 | Structured Score legend | Original objects and arrays are retained; the official output table describes `map<string,string>`, and this boundary has not been validated against its SDK |
-| Noul | Only `type` and `noul`; shipped models encode all inputs under a fixed retrieval instruction, using a similarity difference with criteria or one similarity without criteria; legacy and fixed yes/no mappings remain optional |
+| Noul | Only `type` and `noul`; all inputs use a retrieval instruction, comparing question-plus-state against true/false criteria when supplied or question against state otherwise |
 | Model selection | Explicit registration and aliases; canonical response ID; no silent fallback |
 | HTTP model field | Required; Python calls may use the default model |
 | HTTP resource limits | Configurable body, question, embedding-input, and active-request caps; 413 for size/work violations and 429 when busy; Python calls are unaffected |

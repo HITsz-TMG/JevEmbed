@@ -100,13 +100,11 @@ The following requests reproduce the Jev documentation examples, changing only `
 Model inference used CPU FP32 with caching disabled. The results below use these prompt and scoring settings from the [KaLM configuration](configs/kalm-embedding-v2.5.yaml):
 
 ```yaml
-prompts:
-  noul_format: retrieval
 scoring:
   choice_temperature: 0.1
   score_temperature: 0.1
-  noul_criteria: {slope: 10.0, intercept: 0.0}
-  noul_similarity: {slope: 10.0, intercept: 0.0}
+  noul_with_criteria: {slope: 10.0, intercept: 0.0}
+  noul_without_criteria: {slope: 10.0, intercept: 0.0}
   confidence: normalized_entropy
   calibration_status: uncalibrated
 ```
@@ -115,9 +113,9 @@ scoring:
 | --- | --- | --- |
 | `choice_temperature: 0.1` | Exchange routing | Probabilities are `softmax(cosine / T)`. Temperature changes concentration without changing the similarity ranking or winning choice. |
 | `score_temperature: 0.1` | Safari severity | Uses the same softmax with an independent T. Changing T can change the expected score; level rankings stay the same. |
-| `noul_format: retrieval` | Both Noul questions | Encodes every input as a query under `Retrieve semantically similar text.` |
-| `noul_criteria: {slope: 10, intercept: 0}` | Repeat contact | Compares the state query with two queries made from the question plus each criterion, then uses `sigmoid((s_true - s_false) / 0.1)`. |
-| `noul_similarity: {slope: 10, intercept: 0}` | Human escalation | Compares the question query with the state query, then uses `sigmoid(cosine / 0.1)`. |
+| Noul input encoding | Both Noul questions | Encodes every input as a query under `Retrieve semantically similar text.` |
+| `noul_with_criteria: {slope: 10, intercept: 0}` | Repeat contact | Compares the question-plus-state query with `true: criterion` and `false: criterion` queries, then uses `sigmoid((s_true - s_false) / 0.1)`. |
+| `noul_without_criteria: {slope: 10, intercept: 0}` | Human escalation | Compares the question query with the state query, then uses `sigmoid(cosine / 0.1)`. |
 | `confidence: normalized_entropy` | Choice and Score | Measures distribution concentration. A sharper distribution can raise confidence without improving correctness. |
 
 **These results are uncalibrated.** Temperature 0.1 sharpens Choice and Score distributions while preserving similarity rankings. Noul uses the corresponding slope of 10 on a single similarity or a true-minus-false difference. Changing Choice/Score temperature alone does not change Noul. No parameters were fitted to these examples.
@@ -131,11 +129,11 @@ Small numerical differences can occur with different hardware, precision, or mod
 | Choice: exchange routing | `returns`, probability 1.0 | `returns`, probability 0.793768 |
 | Score: Safari bug severity | 1.43 | 1.256149 |
 | Noul: human escalation | 0.99 | 0.999815 |
-| Noul: repeat contact | 0.93 | 0.517449 |
+| Noul: repeat contact | 0.93 | 0.520574 |
 
 Reference outputs are taken from the saved Jev documentation examples, rather than new API calls. Both columns contain model predictions, not independently annotated ground truth. These examples illustrate API behavior and do not constitute an accuracy benchmark.
 
-The same requests were also run on three other models; see the [four-model CPU example results](examples/README.md).
+The same requests were run on all five supported models with CUDA BF16; see the [example results](examples/README.md).
 
 ### Choice: route an exchange request
 
@@ -298,15 +296,15 @@ KaLM response:
   "answers": {
     "is_human_escalation": {
       "type": "noul",
-      "noul": 0.9998150636826051
+      "noul": 0.9998150635615807
     },
     "is_repeat_contact": {
       "type": "noul",
-      "noul": 0.517448626566391
+      "noul": 0.5205740521193529
     }
   },
   "usage": {
-    "input_tokens": 112,
+    "input_tokens": 136,
     "output_tokens": 0
   }
 }
@@ -408,32 +406,31 @@ Blocking issue; no workaround exists
 
 **KaLM result:** probabilities approximately **[0.153769, 0.436313, 0.409918]**, giving a score of **1.256149** at temperature **0.1**. The response also retains the descriptions as its legend.
 
-### Noul with criteria — compare question-plus-criterion queries
+### Noul with criteria — compare the question and state with each criterion
 
-**Case: detect repeat contact.** Encode the state under the fixed retrieval instruction:
-
-```text
-Instruct: Retrieve semantically similar text.
-Query: I have asked three times now. Can I please just talk to a real person?
-```
-
-Encode the original question plus each criterion as separate queries, with one newline between them:
+**Case: detect repeat contact.** Encode the question and state together under the retrieval instruction:
 
 ```text
 Instruct: Retrieve semantically similar text.
 Query: Has the customer contacted support about this before?
-Mentions a prior attempt, ticket, or that they have asked before
+I have asked three times now. Can I please just talk to a real person?
+```
+
+Encode each criterion as a separate query, prefixed with its true/false label:
+
+```text
+Instruct: Retrieve semantically similar text.
+Query: true: Mentions a prior attempt, ticket, or that they have asked before
 ```
 
 ```text
 Instruct: Retrieve semantically similar text.
-Query: Has the customer contacted support about this before?
-No sign of any previous contact
+Query: false: No sign of any previous contact
 ```
 
-**Scoring:** compare the state query with each question-plus-criterion query, subtract the false similarity from the true similarity, and apply `sigmoid(difference / 0.1)`. The true/false labels are not added to the model input.
+**Scoring:** compare the question-plus-state query with each criterion query, subtract the false similarity from the true similarity, and apply `sigmoid(difference / 0.1)`.
 
-**KaLM result:** **0.517449** with slope **10.0** and intercept **0.0**. The true query scores slightly above the false query; the margin is small, so this single result does not establish reliable repeat-contact detection.
+**KaLM result:** **0.520574** with slope **10.0** and intercept **0.0**. The true and false similarities were **0.756465** and **0.748231**; the margin is small, so this single result does not establish reliable repeat-contact detection.
 
 ### Noul without criteria — compare two queries
 
@@ -503,7 +500,6 @@ In our [KaLM v2.5 reference run](reports/OPEN_JEV_KALM_LORA.md), we used one epo
 | Open-Jev validation Choice accuracy (740 hard labels) | 40.95% | 62.84% |
 | Open-Jev validation Score level accuracy (470 hard labels) | 24.26% | 63.62% |
 | Open-Jev validation Noul binary accuracy (2,285 questions) | 28.01% | 83.85% |
-| JevBench public-subset accuracy (231 tasks) | 52.38% | 55.41% |
 
 We repeated the one-epoch recipe with **Qwen3-Embedding-0.6B** on the same Open-Jev splits. The [Qwen3 reference run](reports/OPEN_JEV_QWEN3_0.6B_LORA.md) compares its base model with the final adapter:
 
@@ -513,9 +509,8 @@ We repeated the one-epoch recipe with **Qwen3-Embedding-0.6B** on the same Open-
 | Open-Jev validation Choice accuracy (740 hard labels) | 40.00% | 74.46% |
 | Open-Jev validation Score level accuracy (470 hard labels) | 29.36% | 80.43% |
 | Open-Jev validation Noul binary accuracy (2,285 questions) | 28.01% | 87.92% |
-| JevBench public-subset accuracy (231 tasks) | 54.55% | 50.65% (−3.90 pp) |
 
-Both JevBench comparisons use the current retrieval-style Noul encoding and each model's native input limit. Qwen3's JevBench decrease is concentrated in Noul (39/74 to 28/74); Open-Jev Noul examples lack criteria, while all public JevBench Noul tasks supply them. The [training guide](docs/training.md) covers model-specific LoRA targets, token limits, checkpoint resume, and adapter inference.
+The [training guide](docs/training.md) covers model-specific LoRA targets, token limits, checkpoint resume, and adapter inference.
 
 ## Development and validation
 
@@ -533,16 +528,16 @@ Original requests and reference responses are stored in `tests/fixtures/`. Save 
 
 ## JevBench public-subset results
 
-These runs use the current configurations: Choice/Score temperature **0.1**, Noul slope **10**, the retrieval-style Noul encoding, and BF16. Accuracy covers **231 public tasks**, not the full JevBench leaderboard.
+These runs use the shipped configurations, Choice/Score temperature **0.1**, Noul slope **10**, and BF16. Accuracy covers **231 public tasks**, not the full JevBench leaderboard.
 
 | Model | Easy (48) | Standard (72) | Hard (111) | Overall (231) |
 | --- | ---: | ---: | ---: | ---: |
-| `KaLM-Embedding/KaLM-embedding-multilingual-mini-instruct-v2.5` | 93.75% (45/48) | 51.39% (37/72) | 35.14% (39/111) | 52.38% (121/231) |
-| `Qwen/Qwen3-Embedding-0.6B` | 93.75% (45/48) | 59.72% (43/72) | 34.23% (38/111) | 54.55% (126/231) |
-| `Qwen/Qwen3-Embedding-4B` | 97.92% (47/48) | 62.50% (45/72) | 39.64% (44/111) | **58.87% (136/231)** |
-| `Qwen/Qwen3-Embedding-8B` | 95.83% (46/48) | 63.89% (46/72) | 36.04% (40/111) | 57.14% (132/231) |
-| `intfloat/multilingual-e5-large-instruct` (default) | 93.75% (45/48) | 54.17% (39/72) | 26.13% (29/111) | 48.92% (113/231) |
-| `intfloat/multilingual-e5-large-instruct` (explicit truncation) | 93.75% (45/48) | 54.17% (39/72) | 33.33% (37/111) | 52.38% (121/231) |
+| `KaLM-Embedding/KaLM-embedding-multilingual-mini-instruct-v2.5` | 91.67% (44/48) | 50.00% (36/72) | 35.14% (39/111) | 51.52% (119/231) |
+| `Qwen/Qwen3-Embedding-0.6B` | 93.75% (45/48) | 61.11% (44/72) | 36.94% (41/111) | 56.28% (130/231) |
+| `Qwen/Qwen3-Embedding-4B` | 89.58% (43/48) | 62.50% (45/72) | 39.64% (44/111) | 57.14% (132/231) |
+| `Qwen/Qwen3-Embedding-8B` | 93.75% (45/48) | 69.44% (50/72) | 36.04% (40/111) | **58.44% (135/231)** |
+| `intfloat/multilingual-e5-large-instruct` (default) | 95.83% (46/48) | 55.56% (40/72) | 27.03% (30/111) | 50.22% (116/231) |
+| `intfloat/multilingual-e5-large-instruct` (explicit truncation) | 95.83% (46/48) | 55.56% (40/72) | 36.04% (40/111) | 54.55% (126/231) |
 
 E5's default 512-token limit rejects 53 Hard tasks, which count as incorrect. The supplemental truncation run processes those inputs at 512 tokens. All other runs return valid answers without truncation.
 

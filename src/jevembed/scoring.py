@@ -58,7 +58,7 @@ def score_plan(plan, vectors, config, confidence_estimator=normalized_entropy):
     similarities = [min(1.0, max(-1.0, math.fsum(a*b for a, b in zip(query, vector)))) for vector in vectors[1:]]
     if plan.kind == "noul":
         parameters = getattr(config, plan.path)
-        value = similarities[0] if plan.path == "noul_similarity" else similarities[0] - similarities[1]
+        value = similarities[0] if plan.path == "noul_without_criteria" else similarities[0] - similarities[1]
         answer = {"type": "noul", "noul": sigmoid(parameters.slope * value + parameters.intercept)}
     else:
         probabilities = softmax(similarities, getattr(config, f"{plan.kind}_temperature"))

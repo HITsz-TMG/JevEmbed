@@ -14,13 +14,10 @@ class PromptConfig:
     document_template: str = "{text}"
     similarity_instruction: str = "Retrieve semantically similar text."
     version: str = "v1"
-    noul_format: str = "legacy"
 
     def __post_init__(self):
         if any(not isinstance(value, str) for value in (self.query_template, self.document_template, self.similarity_instruction, self.version)):
             raise ValidationError("Prompt settings must be strings")
-        if self.noul_format not in ("legacy", "unified", "retrieval"):
-            raise ValidationError("noul_format must be legacy, unified, or retrieval")
         for template in (self.query_template, self.document_template):
             try:
                 fields = {f for _, f, _, _ in Formatter().parse(template) if f is not None}
@@ -46,8 +43,8 @@ class LogisticConfig:
 class ScoringConfig:
     choice_temperature: float = 0.1
     score_temperature: float = 0.1
-    noul_criteria: LogisticConfig = field(default_factory=LogisticConfig)
-    noul_similarity: LogisticConfig = field(default_factory=LogisticConfig)
+    noul_with_criteria: LogisticConfig = field(default_factory=LogisticConfig)
+    noul_without_criteria: LogisticConfig = field(default_factory=LogisticConfig)
     confidence: str = "normalized_entropy"
     calibration_status: str = "uncalibrated"
     calibration_record: dict = field(default_factory=dict)
@@ -130,9 +127,19 @@ class ModelConfig:
             if not isinstance(data, dict):
                 raise ValueError("model config must be a mapping")
             data = dict(data)
-            data["prompts"] = PromptConfig(**data.get("prompts", {}))
+            prompts = dict(data.get("prompts", {}))
+            old_noul_format = prompts.pop("noul_format", "retrieval")
+            if old_noul_format != "retrieval":
+                raise ValueError("noul_format only supports retrieval; legacy and unified Noul mappings are no longer supported")
+            data["prompts"] = PromptConfig(**prompts)
             scoring = dict(data.get("scoring", {}))
-            for key in ("noul_criteria", "noul_similarity"):
+            for old, new in (("noul_criteria", "noul_with_criteria"),
+                             ("noul_similarity", "noul_without_criteria")):
+                if old in scoring:
+                    if new in scoring:
+                        raise ValueError(f"Use either {old} or {new}, not both")
+                    scoring[new] = scoring.pop(old)
+            for key in ("noul_with_criteria", "noul_without_criteria"):
                 if key in scoring:
                     scoring[key] = LogisticConfig(**scoring[key])
             data["scoring"] = ScoringConfig(**scoring)

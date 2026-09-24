@@ -107,25 +107,24 @@ The complete distribution is retained because different distributions can have t
 
 ### Noul with criteria
 
-The shipped configurations set `noul_format: retrieval`. Encode the state as a query under the fixed retrieval instruction:
-
-```text
-Instruct: Retrieve semantically similar text.
-Query: I have asked three times now. Can I please just talk to a real person?
-```
-
-Encode the original question plus each criterion as separate query-role inputs, in true/false order regardless of JSON key order. A newline separates the question and criterion; the true/false keys are not added to the text:
+Encode the original question and state together as one query under the fixed retrieval instruction:
 
 ```text
 Instruct: Retrieve semantically similar text.
 Query: Has the customer contacted support about this before?
-Mentions a prior attempt, ticket, or that they have asked before
+I have asked three times now. Can I please just talk to a real person?
+```
+
+Encode each criterion as a separate query, prefixed with its true/false key and ordered true then false regardless of JSON key order:
+
+```text
+Instruct: Retrieve semantically similar text.
+Query: true: Mentions a prior attempt, ticket, or that they have asked before
 ```
 
 ```text
 Instruct: Retrieve semantically similar text.
-Query: Has the customer contacted support about this before?
-No sign of any previous contact
+Query: false: No sign of any previous contact
 ```
 
 ### Noul without criteria
@@ -142,7 +141,7 @@ Instruct: Retrieve semantically similar text.
 Query: I have asked three times now. Can I please just talk to a real person?
 ```
 
-This path uses one cosine similarity and generates no true/false candidates or unknown category. Bare `PromptConfig()` retains the older `legacy` mapping for compatibility; the optional `unified` mapping uses fixed yes/no documents. Both remain available for existing adapters. The shipped `retrieval` mapping does not inherently distinguish semantic relevance from agreement.
+This path uses one cosine similarity and generates no true/false candidates or unknown category. The retrieval mapping does not inherently distinguish semantic relevance from agreement.
 
 ## Scoring
 
@@ -160,9 +159,9 @@ Temperatures are finite and positive, with independent Choice and Score defaults
 
 ```text
 Noul with criteria:
-  sigmoid(a_criteria * (cosine(q_state, q_question_true) - cosine(q_state, q_question_false)) + b_criteria)
+  sigmoid(a_with * (cosine(q_question_state, q_true_criterion) - cosine(q_question_state, q_false_criterion)) + b_with)
 Noul without criteria:
-  sigmoid(a_similarity * cosine(q_question, q_state) + b_similarity)
+  sigmoid(a_without * cosine(q_question, q_state) + b_without)
 ```
 
 Both Noul parameter pairs default to slope 10 and intercept 0, corresponding to temperature 0.1 under `slope = 1/T` in their logistic mappings. All default mappings are uncalibrated. A value in [0,1] is not evidence of calibration. See [calibration](calibration.md) for configuration, fitting records, and evaluation requirements.

@@ -32,7 +32,7 @@ def task_loss(vectors, path, mode, target, config):
     similarities = (vectors[1:] @ vectors[0]).clamp(-1, 1)
     if path.startswith("noul"):
         parameters = getattr(config, path)
-        value = similarities[0] if path == "noul_similarity" else similarities[0] - similarities[1]
+        value = similarities[0] if path == "noul_without_criteria" else similarities[0] - similarities[1]
         logit = parameters.slope * value + parameters.intercept
         return F.binary_cross_entropy_with_logits(logit, target[0])
     logits = similarities / getattr(config, f"{path}_temperature")
