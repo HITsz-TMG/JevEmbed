@@ -12,15 +12,3 @@ Qwen3-Embedding-0.6B was fine-tuned for one epoch on [ZefanCai/Open-Jev](https:/
 | Noul binary accuracy (2,285 questions) | 28.01% | 87.92% |
 
 Overall accuracy pools the 740 Choice, 470 Score, and 2,285 Noul hard labels. The other 228 validation questions have soft targets or expected Score values and are excluded from this accuracy.
-
-The base model and final adapter were also evaluated on all 231 public JevBench tasks with the [current Qwen3 configuration](../configs/qwen3-embedding-0.6b.yaml), BF16, the model's native input limit, and identical scoring and prompts. All tasks returned valid answers.
-
-| JevBench metric | Base | Final adapter |
-| --- | ---: | ---: |
-| Overall accuracy | 56.28% (130/231) | 55.84% (129/231) |
-| Choice accuracy | 56.12% (78/139) | 58.99% (82/139) |
-| Score accuracy | 50.00% (9/18) | 38.89% (7/18) |
-| Noul accuracy | 58.11% (43/74) | 54.05% (40/74) |
-| Score expected-level MAE (lower is better) | 0.579 | 0.645 |
-
-The validation gain did not carry over to the public JevBench total, which changed by −0.43 percentage points. These are public-subset results, not an official full-benchmark score.

@@ -218,10 +218,10 @@ The HTTP API provides `POST /v1/systemone` and `GET /v1/models`, binding to loop
 | `scoring.py`, `cache.py` | Probability mappings, confidence, and bounded caching |
 | `server.py`, `cli.py` | HTTP and command-line interfaces |
 | `configs/`, `examples/` | Portable configurations and shared task examples |
-| `tests/`, `reports/` | Regression tests and published benchmark results |
+| `tests/`, `reports/` | Regression tests and published test-set results |
 
 Core dependencies remain lightweight. Local inference, HTTP clients, and servers have separate optional dependency groups.
 
-## Examples and benchmark results
+## Examples and test results
 
-The [shared examples](../examples/README.md) show Choice, Score, and both Noul forms. The [JevBench public evaluation](../reports/JEVBENCH_PUBLIC.md) reports model accuracy, calibration, latency, and scope.
+The [shared examples](../examples/README.md) show Choice, Score, and both Noul forms. The [JevEmbed-Data test evaluation](../reports/JEVEMBED_DATA_TEST.md) reports model accuracy and error metrics with their denominators.

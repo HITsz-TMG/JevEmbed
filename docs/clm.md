@@ -21,4 +21,4 @@ client = JevEmbed(config=config)
 print(client.evaluate(request))
 ```
 
-The [example results](../examples/README.md) and [JevBench results](../reports/JEVBENCH_PUBLIC.md) provide measured outputs.
+The [example results](../examples/README.md) and [JevEmbed-Data test results](../reports/JEVEMBED_DATA_TEST.md) provide measured outputs.

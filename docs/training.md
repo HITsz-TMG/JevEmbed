@@ -107,7 +107,7 @@ Cosines are bounded. With the default slope/intercept, criteria-based Noul can o
 
 Training loss averages questions across task types, so short-term changes also reflect the sampled task mix and label difficulty. The default learning rate warms up over the first 10% of optimizer steps. Compare the fixed validation split before and after training, including task accuracy and MAE, before judging convergence. Choice and Score use their configured temperatures; Noul uses its slope and intercept instead.
 
-Small synthetic format examples are in [examples/training](../examples/training/README.md). They are for checking the pipeline, not for measuring model quality. JevBench remains a separate evaluation set and is not mixed into training.
+Small synthetic format examples are in [examples/training](../examples/training/README.md). They are for checking the pipeline, not for measuring model quality. Keep a separate validation split for checkpoint selection and reserve the test split for final evaluation.
 
 ## Outputs, inference, and resume
 
@@ -136,24 +136,21 @@ Resume requires the original output directory and matching settings/data, includ
 
 The final adapter is the final training step, not an automatically selected best checkpoint. Epoch validation reports loss. Final validation additionally reports hard-label accuracy where defined, Score MAE, Noul MAE, and Brier/TVD against target distributions, each with its denominator. Soft targets are not silently converted to hard labels. Without `--eval-data`, no held-out metrics are claimed.
 
-## Compare checkpoints on JevBench
+## Evaluate the JevEmbed-Data test split
 
-Start the checkpoint watcher while training is running, before older saves rotate out:
+Use the held-out [JevEmbed-Data](https://huggingface.co/datasets/HIT-TMG/JevEmbed-Data) test Parquet after selecting your model on validation data. Install the training dependencies to read Parquet:
 
 ```bash
-python scripts/evaluate_lora_checkpoints.py \
-  --training-output artifacts/lora/kalm \
-  --benchmark-root ../jevbench-main \
+python -m pip install -e '.[train]'
+python scripts/evaluate_jevembed_data.py \
   --config configs/kalm-embedding-v2.5.yaml \
-  --output artifacts/jevbench/kalm-checkpoints \
-  --wait-for-training
+  --test-data path/to/JevEmbed-Data/data/test-00000-of-00001.parquet \
+  --device cuda --dtype bfloat16 \
+  --max-input-tokens 1024 --overflow-policy truncate \
+  --output artifacts/evaluations/kalm-test.json
 ```
 
-For offline base weights, add `--model-path ./models/kalm`. Optionally pass the training process ID with `--training-pid` so the watcher detects an interrupted job. The watcher archives completed adapter saves every five seconds, then waits for final training metrics before running GPU evaluations. It does not keep optimizer state. Run it in a persistent session if it must survive a terminal disconnect.
-
-The comparison includes the base model, every scheduled checkpoint, and the final adapter. Missing scheduled checkpoints cause an error. Each run evaluates all 231 public tasks using the upstream scoring implementation, with identical prompts, temperature, and input limits. The supplied **base inference configuration** controls evaluation length; it does not inherit the training token cap. The example uses the model's native context limit for both base and adapted models, while training remains capped at 1024 tokens.
-
-Results include per-checkpoint raw evidence, `comparison.json`, and a `COMPARISON.md` table of accuracy, changes from the base model, task-specific accuracy, and Score MAE. These are exploratory comparisons on public tasks, not an official full-benchmark score or an independent test of a checkpoint selected using these same results. Runtime artifacts may contain local paths and remain under the ignored `artifacts/` directory.
+The report includes hard-label accuracy for Choice, Score, and Noul, plus Score/Noul MAE and distribution metrics with their denominators. For a trained adapter, pass `--adapter-path` and its base model's local weights with `--model-path`. Save runtime results under the ignored `artifacts/` directory.
 
 The generated inference configuration uses the original base model identifier. To use local base weights, change its `model_name_or_path` and set `local_files_only: true`, or use `dataclasses.replace` in Python. Relative adapter paths resolve from the working directory. Keep run artifacts and data under ignored directories; generated runtime files may contain local paths.
 

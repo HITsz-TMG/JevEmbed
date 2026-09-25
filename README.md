@@ -518,23 +518,20 @@ The automated test suite uses fixed vectors, mock models, and temporary local HT
 
 Original requests and reference responses are stored in `tests/fixtures/`. Save generated traces under the ignored `artifacts/` directory, as diagnostics may contain local paths.
 
-## JevBench public-subset results
+## JevEmbed-Data test results
 
-These runs use the shipped configurations and BF16. The five Sentence Transformers models use Choice/Score temperature **0.1** and Noul slope **10**; CLM uses **0.01** and **100**, matching its projection checkpoint. Accuracy covers **231 public tasks**, not the full JevBench leaderboard.
+The six supported base models were evaluated without LoRA on the **66,482-question** [JevEmbed-Data](https://huggingface.co/datasets/HIT-TMG/JevEmbed-Data) `test` split. Runs used BF16, each model's configured prompts and scoring, and truncation at 1,024 tokens for KaLM/Qwen3, 512 for E5, or 2,048 for CLM. Accuracy covers the **64,110 hard-labeled** questions; soft-label questions are excluded.
 
-| Model | Easy (48) | Standard (72) | Hard (111) | Overall (231) |
+| Model | Choice (17,487) | Score (24,260) | Noul (22,363) | Overall (64,110) |
 | --- | ---: | ---: | ---: | ---: |
-| `KaLM-Embedding/KaLM-embedding-multilingual-mini-instruct-v2.5` | 91.67% (44/48) | 50.00% (36/72) | 35.14% (39/111) | 51.52% (119/231) |
-| `Qwen/Qwen3-Embedding-0.6B` | 93.75% (45/48) | 61.11% (44/72) | 36.94% (41/111) | 56.28% (130/231) |
-| `Qwen/Qwen3-Embedding-4B` | 89.58% (43/48) | 62.50% (45/72) | 39.64% (44/111) | 57.14% (132/231) |
-| `Qwen/Qwen3-Embedding-8B` | 93.75% (45/48) | 69.44% (50/72) | 36.04% (40/111) | **58.44% (135/231)** |
-| `Contrastive-LM/CLM-v0.1-8B` | 68.75% (33/48) | 34.72% (25/72) | 35.14% (39/111) | 41.99% (97/231) |
-| `intfloat/multilingual-e5-large-instruct` (default) | 95.83% (46/48) | 55.56% (40/72) | 27.03% (30/111) | 50.22% (116/231) |
-| `intfloat/multilingual-e5-large-instruct` (explicit truncation) | 95.83% (46/48) | 55.56% (40/72) | 36.04% (40/111) | 54.55% (126/231) |
+| `KaLM-Embedding/KaLM-embedding-multilingual-mini-instruct-v2.5` | 28.61% | 27.45% | 40.52% | 32.33% |
+| `Qwen/Qwen3-Embedding-0.6B` | 33.02% | 28.56% | 40.05% | 33.79% |
+| `Qwen/Qwen3-Embedding-4B` | 38.11% | 30.55% | 41.09% | 36.29% |
+| `Qwen/Qwen3-Embedding-8B` | 43.20% | 33.49% | 42.57% | **39.30%** |
+| `intfloat/multilingual-e5-large-instruct` | 32.07% | 24.27% | 40.54% | 32.07% |
+| `Contrastive-LM/CLM-v0.1-8B` | 28.59% | 25.85% | 53.74% | 36.33% |
 
-E5's default 512-token limit rejects 53 Hard tasks, which count as incorrect. The supplemental truncation run processes those inputs at 512 tokens. CLM returns valid answers for all tasks, with at least one input truncated on 36 tasks under its 2048-token limit. KaLM and the Qwen3 embedding models return valid answers without truncation.
-
-The [JevBench public evaluation](reports/JEVBENCH_PUBLIC.md) reports task-type accuracy, calibration, and latency. The [embedding-model metrics](reports/jevbench-public.json) and [CLM metrics](reports/clm-v0.1-8b-public.json) are available in JSON.
+The [full test report](reports/JEVEMBED_DATA_TEST.md) gives the error metrics, denominators, and evaluation command.
 
 See the [compatibility boundaries](docs/compatibility.md) and [architecture and design](docs/design.md) for the implementation contract.
 
