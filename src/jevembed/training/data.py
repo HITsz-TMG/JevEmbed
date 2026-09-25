@@ -64,7 +64,7 @@ def _target(plan, answer):
 def load_examples(path, config):
     examples, ids, seen = [], set(), {}
     adapter = PromptAdapter(config.prompts)
-    for line_number, line in enumerate(Path(path).read_text(encoding="utf-8").splitlines(), 1):
+    for line_number, line in enumerate(_lines(path), 1):
         if not line.strip():
             continue
         try:
@@ -98,6 +98,11 @@ def load_examples(path, config):
     if not examples:
         raise ValidationError("Training data is empty")
     return examples
+
+
+def _lines(path):
+    with Path(path).open(encoding="utf-8") as handle:
+        yield from handle
 
 
 def _unique_keys(pairs):
@@ -135,3 +140,26 @@ def check_lengths(model, examples, overflow_policy):
         raise ValidationError(f"{counts['overlong_inputs']} training/evaluation inputs exceed "
                               f"{model.max_seq_length} tokens; shorten data or explicitly enable truncation")
     return counts
+
+
+def check_lengths_distributed(model, examples, overflow_policy):
+    """Check each input once across ranks, then report global counts on every rank."""
+    import torch
+    import torch.distributed as dist
+
+    if not dist.is_available() or not dist.is_initialized():
+        return check_lengths(model, examples, overflow_policy)
+    rank, world_size = dist.get_rank(), dist.get_world_size()
+    local = check_lengths(model, examples[rank::world_size], "truncate")
+    counts = torch.tensor([local[key] for key in
+                           ("questions", "inputs", "overlong_questions", "overlong_inputs", "max_original_tokens")],
+                          dtype=torch.long, device=next(model.parameters()).device)
+    dist.all_reduce(counts[:4], op=dist.ReduceOp.SUM)
+    dist.all_reduce(counts[4:], op=dist.ReduceOp.MAX)
+    result = dict(zip(("questions", "inputs", "overlong_questions", "overlong_inputs", "max_original_tokens"),
+                      counts.tolist()))
+    result.update(limit=model.max_seq_length, overflow_policy=overflow_policy)
+    if result["overlong_inputs"] and overflow_policy == "error":
+        raise ValidationError(f"{result['overlong_inputs']} training/evaluation inputs exceed "
+                              f"{model.max_seq_length} tokens; shorten data or explicitly enable truncation")
+    return result

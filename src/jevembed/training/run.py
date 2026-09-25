@@ -4,11 +4,12 @@ from dataclasses import asdict, dataclass, replace
 import hashlib
 import json
 import math
+import os
 from pathlib import Path
 
 from ..config import ModelConfig
 from ..errors import ValidationError
-from .data import check_disjoint, check_lengths, load_examples
+from .data import check_disjoint, check_lengths_distributed, load_examples
 
 
 @dataclass(frozen=True)
@@ -22,7 +23,7 @@ class TrainingConfig:
     max_grad_norm: float = 1.0
     max_steps: int = -1
     max_input_tokens: int = 1024
-    overflow_policy: str = "error"
+    overflow_policy: str = "truncate"
     gradient_checkpointing: bool = True
     lora_rank: int = 8
     lora_alpha: int = 16
@@ -60,6 +61,31 @@ class TrainingConfig:
 
 def write_json(path, data):
     path.write_text(json.dumps(data, ensure_ascii=False, indent=2, allow_nan=False) + "\n", encoding="utf-8")
+
+
+def file_sha256(path):
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for block in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(block)
+    return digest.hexdigest()
+
+
+def main_process_call(process_index, action):
+    """Run shared preprocessing once and deliver its result or error to every rank."""
+    import torch.distributed as dist
+    if not dist.is_available() or not dist.is_initialized():
+        return action()
+    payload = [None]
+    if process_index == 0:
+        try:
+            payload[0] = ("ok", action())
+        except Exception as exc:
+            payload[0] = ("error", f"{type(exc).__name__}: {exc}")
+    dist.broadcast_object_list(payload, src=0)
+    if payload[0][0] == "error":
+        raise ValidationError(payload[0][1])
+    return payload[0][1]
 
 
 def select_targets(model, requested):
@@ -101,8 +127,9 @@ def main(argv=None):
     validation = load_examples(args.eval_data, config) if args.eval_data else []
     check_disjoint(train, validation)
     if args.validate_only:
-        print(json.dumps({"train_questions": len(train), "validation_questions": len(validation),
-                          "status": "valid; token lengths not checked without model loading"}))
+        if int(os.environ.get("RANK", "0")) == 0:
+            print(json.dumps({"train_questions": len(train), "validation_questions": len(validation),
+                              "status": "valid; token lengths not checked without model loading"}))
         return 0
     if args.output.exists() and any(args.output.iterdir()) and not args.resume_from_checkpoint:
         parser.error("Output directory is not empty; choose a new run or explicitly resume a checkpoint")
@@ -118,28 +145,55 @@ def main(argv=None):
     from .evaluation import evaluate
     from .trainer import JevTrainer
 
-    if int(__import__("os").environ.get("WORLD_SIZE", "1")) != 1 or (args.device == "cuda" and torch.cuda.device_count() > 1):
-        parser.error("This trainer supports one device per process; select one GPU with CUDA_VISIBLE_DEVICES")
+    launched_world_size = int(os.environ.get("WORLD_SIZE", "1"))
+    if launched_world_size > 1 and "LOCAL_RANK" not in os.environ:
+        parser.error("Distributed training requires torchrun with LOCAL_RANK")
     if args.device == "cuda" and not torch.cuda.is_available():
         parser.error("CUDA requested but unavailable")
+    if args.device == "cuda" and launched_world_size == 1 and torch.cuda.device_count() > 1:
+        parser.error("Select one GPU with CUDA_VISIBLE_DEVICES or launch one process per GPU with torchrun")
+    if args.device == "cuda" and launched_world_size > 1:
+        local_rank = int(os.environ["LOCAL_RANK"])
+        if not 0 <= local_rank < torch.cuda.device_count():
+            parser.error("LOCAL_RANK must identify a visible CUDA device")
+        torch.cuda.set_device(local_rank)
     if args.device == "cuda" and args.dtype == "bfloat16" and not torch.cuda.is_bf16_supported():
         parser.error("BF16 is unavailable; use --dtype float32")
     torch.set_num_threads(settings.threads)
     set_seed(settings.seed)
-    local_config = replace(config, device=args.device, dtype=args.dtype, cache_capacity=0,
+    training_args = SentenceTransformerTrainingArguments(
+        output_dir=str(args.output), num_train_epochs=settings.epochs, max_steps=settings.max_steps,
+        per_device_train_batch_size=settings.batch_size, per_device_eval_batch_size=settings.batch_size,
+        gradient_accumulation_steps=settings.gradient_accumulation_steps,
+        learning_rate=settings.learning_rate, warmup_ratio=settings.warmup_ratio,
+        weight_decay=settings.weight_decay, max_grad_norm=settings.max_grad_norm,
+        bf16=args.dtype == "bfloat16", fp16=False, use_cpu=args.device == "cpu",
+        gradient_checkpointing=settings.gradient_checkpointing,
+        gradient_checkpointing_kwargs={"use_reentrant": False},
+        eval_strategy="epoch" if validation else "no", save_strategy="steps", save_steps=settings.save_steps,
+        save_total_limit=settings.save_total_limit, logging_steps=settings.logging_steps,
+        report_to=[], push_to_hub=False, seed=settings.seed, data_seed=settings.seed,
+        dataloader_num_workers=0, remove_unused_columns=False,
+        ddp_find_unused_parameters=False)
+    # SentenceTransformerTrainingArguments forces drop_last=True under DDP.
+    # JevTrainer pads the distributed batch sampler instead, preserving all rows.
+    training_args.dataloader_drop_last = False
+    local_config = replace(config, device=str(training_args.device), dtype=args.dtype, cache_capacity=0,
                            overflow_policy=settings.overflow_policy)
     if args.model_path:
         local_config = replace(local_config, model_name_or_path=str(args.model_path.resolve()), local_files_only=True)
     backend = SentenceTransformersBackend(config=local_config)
-    print(f"Loading {config.model_id} for LoRA training", flush=True)
+    if training_args.process_index == 0:
+        print(f"Loading {config.model_id} for LoRA training on {training_args.world_size} process(es)", flush=True)
     identity = backend.prepare()
     model = backend._model
     model.max_seq_length = min(model.max_seq_length, settings.max_input_tokens)
-    print(f"Checking all {len(train)} train and {len(validation)} validation questions; "
-          f"token limit={model.max_seq_length}", flush=True)
-    lengths = {"train": check_lengths(model, train, settings.overflow_policy)}
+    if training_args.process_index == 0:
+        print(f"Checking all {len(train)} train and {len(validation)} validation questions; "
+              f"token limit={model.max_seq_length}", flush=True)
+    lengths = {"train": check_lengths_distributed(model, train, settings.overflow_policy)}
     if validation:
-        lengths["validation"] = check_lengths(model, validation, settings.overflow_policy)
+        lengths["validation"] = check_lengths_distributed(model, validation, settings.overflow_policy)
     targets = select_targets(model, settings.target_modules)
     model.add_adapter(LoraConfig(task_type=TaskType.FEATURE_EXTRACTION, r=settings.lora_rank,
                                 lora_alpha=settings.lora_alpha, lora_dropout=settings.lora_dropout,
@@ -153,58 +207,60 @@ def main(argv=None):
         parameter.data = parameter.data.float()
     # Keep PEFT metadata portable even when the base was loaded from a local snapshot.
     model[0].auto_model.peft_config["default"].base_model_name_or_path = config.model_name_or_path
-    manifest = {"training": asdict(settings), "model_id": config.model_id, "scoring": asdict(config.scoring),
-                "prompts": asdict(config.prompts), "target_modules": targets, "lengths": lengths,
-                "base_revision": identity["resolved_revision"], "base_model": config.model_name_or_path,
-                "dataset_sha256": {"train": hashlib.sha256(args.train_data.read_bytes()).hexdigest(),
-                                   "validation": hashlib.sha256(args.eval_data.read_bytes()).hexdigest() if args.eval_data else None},
-                "dtype": args.dtype, "trainable_parameters": sum(p.numel() for _, p in trainable),
-                "total_parameters": sum(p.numel() for p in model.parameters())}
-    args.output.mkdir(parents=True, exist_ok=True)
-    manifest_path = args.output / "training_manifest.json"
-    if args.resume_from_checkpoint:
-        if not args.resume_from_checkpoint.is_dir() or not manifest_path.exists():
-            parser.error("Resume requires an existing checkpoint and the original output manifest")
-        if json.loads(manifest_path.read_text()) != manifest:
-            parser.error("Resume configuration/data differs from the saved manifest")
-    else:
-        write_json(manifest_path, manifest)
+    def prepare_manifest():
+        manifest = {"training": asdict(settings), "model_id": config.model_id, "scoring": asdict(config.scoring),
+                    "prompts": asdict(config.prompts), "target_modules": targets, "lengths": lengths,
+                    "base_revision": identity["resolved_revision"], "base_model": config.model_name_or_path,
+                    "dataset_sha256": {"train": file_sha256(args.train_data),
+                                       "validation": file_sha256(args.eval_data) if args.eval_data else None},
+                    "dtype": args.dtype, "trainable_parameters": sum(p.numel() for _, p in trainable),
+                    "total_parameters": sum(p.numel() for p in model.parameters())}
+        if training_args.world_size > 1:
+            manifest["world_size"] = training_args.world_size
+            manifest["effective_batch_size"] = (
+                settings.batch_size * settings.gradient_accumulation_steps * training_args.world_size)
+        args.output.mkdir(parents=True, exist_ok=True)
+        manifest_path = args.output / "training_manifest.json"
+        if args.resume_from_checkpoint:
+            if not args.resume_from_checkpoint.is_dir() or not manifest_path.exists():
+                raise ValidationError("Resume requires an existing checkpoint and the original output manifest")
+            if json.loads(manifest_path.read_text()) != manifest:
+                raise ValidationError("Resume configuration/data differs from the saved manifest")
+        else:
+            write_json(manifest_path, manifest)
+        return manifest
 
-    training_args = SentenceTransformerTrainingArguments(
-        output_dir=str(args.output), num_train_epochs=settings.epochs, max_steps=settings.max_steps,
-        per_device_train_batch_size=settings.batch_size, per_device_eval_batch_size=settings.batch_size,
-        gradient_accumulation_steps=settings.gradient_accumulation_steps,
-        learning_rate=settings.learning_rate, warmup_ratio=settings.warmup_ratio,
-        weight_decay=settings.weight_decay, max_grad_norm=settings.max_grad_norm,
-        bf16=args.dtype == "bfloat16", fp16=False, use_cpu=args.device == "cpu",
-        gradient_checkpointing=settings.gradient_checkpointing,
-        gradient_checkpointing_kwargs={"use_reentrant": False},
-        eval_strategy="epoch" if validation else "no", save_strategy="steps", save_steps=settings.save_steps,
-        save_total_limit=settings.save_total_limit, logging_steps=settings.logging_steps,
-        report_to=[], push_to_hub=False, seed=settings.seed, data_seed=settings.seed,
-        dataloader_num_workers=0, remove_unused_columns=False)
+    manifest = main_process_call(training_args.process_index, prepare_manifest)
+    train_dataset = Dataset.from_list([e.training_row() for e in train])
+    del train
     trainer = JevTrainer(model=model, args=training_args,
-                      train_dataset=Dataset.from_list([e.training_row() for e in train]),
+                      train_dataset=train_dataset,
                       eval_dataset=Dataset.from_list([e.training_row() for e in validation]) if validation else None,
                       loss=JevLoss(model, config.scoring), data_collator=JevCollator(model))
-    print("Evaluating the base model on validation data" if validation else "No validation data supplied", flush=True)
+    if training_args.process_index == 0:
+        print("Evaluating the base model on validation data" if validation else "No validation data supplied", flush=True)
     baseline = evaluate(model, validation, local_config) if validation else None
-    if baseline is not None:
+    if baseline is not None and training_args.process_index == 0:
         write_json(args.output / "baseline_metrics.json", baseline)
-    print(f"Starting optimization: batch_size={settings.batch_size}, "
-          f"gradient_accumulation_steps={settings.gradient_accumulation_steps}, epochs={settings.epochs}", flush=True)
+    if training_args.process_index == 0:
+        print(f"Starting optimization: per_device_batch_size={settings.batch_size}, "
+              f"gradient_accumulation_steps={settings.gradient_accumulation_steps}, "
+              f"world_size={training_args.world_size}, epochs={settings.epochs}", flush=True)
     train_result = trainer.train(resume_from_checkpoint=str(args.resume_from_checkpoint) if args.resume_from_checkpoint else None)
     adapter_dir = args.output / "adapter"
     trainer.save_model(str(adapter_dir))
     trainer.save_state()
     after = evaluate(model, validation, local_config) if validation else None
-    write_json(args.output / "metrics.json", {"train": train_result.metrics,
-               "validation_base": baseline, "validation_after": after,
-               "note": "Validation uses the configured training token limit; no held-out claims without eval-data."})
-    inference = asdict(replace(config, adapter_name_or_path=str(adapter_dir), adapter_revision=None,
-                              cache_capacity=0, max_input_tokens=model.max_seq_length,
-                              overflow_policy=settings.overflow_policy))
-    (args.output / "inference.yaml").write_text(yaml.safe_dump(inference, sort_keys=False), encoding="utf-8")
-    print(json.dumps({"adapter": str(adapter_dir), "trainable_parameters": manifest["trainable_parameters"],
-                      "validation_after": after}))
+    if training_args.process_index == 0:
+        write_json(args.output / "metrics.json", {"train": train_result.metrics,
+                   "validation_base": baseline, "validation_after": after,
+                   "note": "Validation uses the configured training token limit; no held-out claims without eval-data."})
+        inference = asdict(replace(config, adapter_name_or_path=str(adapter_dir), adapter_revision=None,
+                                  cache_capacity=0, max_input_tokens=model.max_seq_length,
+                                  overflow_policy=settings.overflow_policy))
+        (args.output / "inference.yaml").write_text(yaml.safe_dump(inference, sort_keys=False), encoding="utf-8")
+        print(json.dumps({"adapter": str(adapter_dir), "trainable_parameters": manifest["trainable_parameters"],
+                          "validation_after": after}))
+    if training_args.world_size > 1:
+        torch.distributed.barrier()
     return 0

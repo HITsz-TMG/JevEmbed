@@ -12,6 +12,18 @@ class JevTrainer(SentenceTransformerTrainer):
         # Transformers must divide by the gradient-accumulation count itself.
         self.model_accepts_loss_kwargs = False
 
+    def get_train_dataloader(self):
+        dataloader = super().get_train_dataloader()
+        if self.args.world_size > 1:
+            # SentenceTransformerTrainer disables Accelerate's even-batch
+            # padding. That can leave the last rank with fewer microbatches,
+            # making DDP hang on the final backward pass.
+            sampler = getattr(dataloader, "batch_sampler", None)
+            if not hasattr(sampler, "even_batches"):
+                raise RuntimeError("Distributed Jev training requires an even-batch sampler")
+            sampler.even_batches = True
+        return dataloader
+
     def set_initial_training_values(self, args, dataloader, total_train_batch_size):
         values = list(super().set_initial_training_values(args, dataloader, total_train_batch_size))
         # Transformers 4.51 floors this count, ending epoch-based runs before

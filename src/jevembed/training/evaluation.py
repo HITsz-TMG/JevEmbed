@@ -1,17 +1,21 @@
 """Held-out task metrics using the unchanged inference scoring path."""
 import torch
+import torch.distributed as dist
 from ..scoring import normalize_vectors, normalized_entropy, score_plan
 from .objective import task_loss
 
 
 def evaluate(model, examples, config):
+    distributed = dist.is_available() and dist.is_initialized()
+    rank = dist.get_rank() if distributed else 0
+    world_size = dist.get_world_size() if distributed else 1
     was_training = model.training
     model.eval()
     losses, choice, levels, score_errors, noul_errors, noul_hard = [], [], [], [], [], []
     brier, tvd = [], []
     try:
         with torch.no_grad():
-            for example in examples:
+            for example in examples[rank::world_size]:
                 vectors = model.encode(example.texts, prompt="", batch_size=config.batch_size,
                                        convert_to_tensor=True, normalize_embeddings=True,
                                        show_progress_bar=False)
@@ -41,11 +45,18 @@ def evaluate(model, examples, config):
                     tvd.append(sum(abs(p-q) for p,q in zip(probabilities, example.target)) / 2)
     finally:
         model.train(was_training)
-    result = {"questions": len(examples), "loss": sum(losses)/len(losses)}
-    for name, values in [("choice_accuracy", choice), ("score_level_accuracy", levels),
-                         ("score_mae", score_errors), ("noul_mae", noul_errors),
-                         ("noul_binary_accuracy", noul_hard), ("target_distribution_brier", brier),
-                         ("target_distribution_tvd", tvd)]:
-        result[name] = sum(values)/len(values) if values else None
-        result[name + "_n"] = len(values)
+    metrics = [("loss", losses), ("choice_accuracy", choice), ("score_level_accuracy", levels),
+               ("score_mae", score_errors), ("noul_mae", noul_errors),
+               ("noul_binary_accuracy", noul_hard), ("target_distribution_brier", brier),
+               ("target_distribution_tvd", tvd)]
+    totals = torch.tensor([[sum(values), len(values)] for _, values in metrics],
+                          dtype=torch.float64, device=next(model.parameters()).device)
+    if distributed:
+        dist.all_reduce(totals, op=dist.ReduceOp.SUM)
+    result = {"questions": len(examples)}
+    for (name, _), (total, count) in zip(metrics, totals.tolist()):
+        n = int(count)
+        result[name] = total / n if n else None
+        if name != "loss":
+            result[name + "_n"] = n
     return result

@@ -1,4 +1,4 @@
-# Single-device training. Batch size counts Jev questions, not encoded texts.
+# Batch size is per device and counts Jev questions, not encoded texts.
 epochs: 1
 batch_size: 32
 gradient_accumulation_steps: 4
@@ -8,7 +8,7 @@ weight_decay: 0.01
 max_grad_norm: 1.0
 max_steps: -1
 max_input_tokens: 1024
-overflow_policy: error
+overflow_policy: truncate
 gradient_checkpointing: true
 lora_rank: 8
 lora_alpha: 16
