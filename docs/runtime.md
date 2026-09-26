@@ -8,7 +8,7 @@ The Sentence Transformers backend loads repository modules, preserving their att
 
 ## Device, precision, and length limits
 
-`device: auto` prefers CUDA and otherwise uses CPU. `dtype: auto` selects bfloat16 on supported CUDA devices and float32 on CPU. E5 uses a 512-token limit, CLM uses 2048, and the other supported configurations use 32768. Overlong inputs fail by default. Explicit `overflow_policy: truncate` enables truncation, recorded in the trace, including cache hits. The paired-projection backend supports left or right truncation separately for queries and documents, as CLM's configuration uses. The sentence-transformers and HTTP backends accept only the default right-side setting; custom backends may implement either side.
+`device: auto` prefers CUDA and otherwise uses CPU. `dtype: auto` selects bfloat16 on supported CUDA devices and float32 on CPU. E5 uses a 512-token limit, CLM uses 2048, and the base KaLM/Qwen3 configurations use 32768. The two JevEmbed fine-tuned configurations use 1024 tokens. CLM and the JevEmbed fine-tuned configurations enable truncation; the base KaLM/Qwen3 and E5 configurations reject overlong inputs by default. Explicit `overflow_policy: truncate` enables truncation, recorded in the trace, including cache hits. The paired-projection backend supports left or right truncation separately for queries and documents, as CLM's configuration uses. The sentence-transformers and HTTP backends accept only the default right-side setting; custom backends may implement either side.
 
 ## Caching
 

@@ -1,0 +1,27 @@
+model_id: jevembed-qwen3-embedding-0.6b
+backend: sentence_transformers
+model_name_or_path: HIT-TMG/JevEmbed-Qwen3-Embedding-0.6B
+aliases: [HIT-TMG/JevEmbed-Qwen3-Embedding-0.6B, JevEmbed-Qwen3-Embedding-0.6B]
+revision: null
+trust_remote_code: false
+local_files_only: false
+device: auto
+dtype: auto
+batch_size: 16
+pooling: model_default
+normalize_embeddings: true
+expected_dimension: 1024
+max_input_tokens: 1024
+overflow_policy: truncate
+attention_implementation: sdpa
+prompts:
+  query_template: "Instruct: {instruction}\nQuery: {text}"
+  document_template: "{text}"
+  similarity_instruction: "Retrieve semantically similar text."
+scoring:
+  choice_temperature: 0.1
+  score_temperature: 0.1
+  noul_with_criteria: {slope: 10.0, intercept: 0.0}
+  noul_without_criteria: {slope: 10.0, intercept: 0.0}
+  confidence: normalized_entropy
+  calibration_status: uncalibrated

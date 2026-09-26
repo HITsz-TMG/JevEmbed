@@ -10,7 +10,7 @@ These examples are organized by task and shared by all supported models.
 
 The JSON files default to `model: kalm-embedding-v2.5`. To switch models, change only `model` and load the corresponding configuration. Keep state, instructions, and criteria unchanged.
 
-The following example predictions use the shipped configurations, CUDA BF16, and disabled caching. Values are rounded to six decimals. They are uncalibrated predictions, not accuracy measurements.
+The following example predictions cover the six original base-model configurations with CUDA BF16 and disabled caching. The fine-tuned models can use the same requests, but are not included in this table. Values are rounded to six decimals. They are uncalibrated predictions, not accuracy measurements.
 
 | Model | Choice: `returns` probability | Score: expected severity | Noul: human escalation | Noul: repeat contact |
 | --- | ---: | ---: | ---: | ---: |
@@ -21,7 +21,7 @@ The following example predictions use the shipped configurations, CUDA BF16, and
 | E5 large instruct | 0.439349 | 1.096561 | 0.999778 | 0.627429 |
 | CLM v0.1-8B | 0.949643 | 0.845996 | 0.691813 | 0.971412 |
 
-All models select `returns` for Choice. CLM uses its own [prompt and projection configuration](../docs/clm.md). The full KaLM CPU FP32 responses and Jev reference outputs appear in the [main README](../README.md#official-jev-examples-with-kalm-results). Small differences are possible with another device, precision, or model revision.
+All models select `returns` for Choice. CLM-v0.1-8B uses its own [prompt and projection configuration](../docs/clm.md). The full KaLM-embedding-multilingual-mini-instruct-v2.5 CPU FP32 responses and Jev reference outputs appear in the [main README](../README.md#official-jev-examples-with-kalm-embedding-v25-results). Small differences are possible with another device, precision, or model revision.
 
 Run this example from the project root:
 

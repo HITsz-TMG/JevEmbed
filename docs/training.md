@@ -12,6 +12,27 @@ The training extra adds PEFT 0.18.1, Accelerate 1.13.0, and Datasets 4.8.4 to th
 
 The implementation follows the [Sentence Transformers PEFT interface](https://www.sbert.net/examples/sentence_transformer/training/peft/README.html) and its [custom loss contract](https://www.sbert.net/docs/sentence_transformer/loss_overview.html#custom-loss-functions). It uses `SentenceTransformerTrainer`, `add_adapter`, and differentiable model forwards; `encode()` is used only for evaluation.
 
+## Prepare JevEmbed-Data
+
+[JevEmbed-Data](https://huggingface.co/datasets/HIT-TMG/JevEmbed-Data) publishes **1,601,157 train questions** in Parquet and a separate `test` split. The trainer reads supervised JSONL. Stream-convert only `train` to the [schema below](#supervision-format-and-objectives), keeping `test` for final evaluation:
+
+```python
+import json
+from pathlib import Path
+from datasets import load_dataset
+
+path = Path("artifacts/jevembed-data/train.jsonl")
+path.parent.mkdir(parents=True, exist_ok=True)
+with path.open("w", encoding="utf-8") as output:
+    for row in load_dataset("HIT-TMG/JevEmbed-Data", split="train", streaming=True):
+        record = {"id": row["id"], "group": row["group"],
+                  "request": json.loads(row["request_json"]),
+                  "answers": json.loads(row["answers_json"])}
+        output.write(json.dumps(record, ensure_ascii=False) + "\n")
+```
+
+Use this file with `--train-data artifacts/jevembed-data/train.jsonl`. The published dataset has no validation split; omit `--eval-data` when using its entire train split. In that case, training produces no held-out validation metrics. The released [KaLM](https://huggingface.co/HIT-TMG/JevEmbed-KaLM-Embedding-V2.5) and [Qwen3 0.6B](https://huggingface.co/HIT-TMG/JevEmbed-Qwen3-Embedding-0.6B) model cards give the settings used for their full-data runs, while the [README](../README.md#lora-fine-tuning) summarizes their test results.
+
 ## Prepare Open-Jev
 
 The data adapter supports [ZefanCai/Open-Jev](https://huggingface.co/datasets/ZefanCai/Open-Jev), defaulting to `release-v2-redistributable` at commit `c67699e13d0ae25e35b77165a4b6b079bedc8aba`.
@@ -70,7 +91,7 @@ torchrun --standalone --nnodes=1 --nproc-per-node=4 -m jevembed.training \
 
 For torchrun across nodes, place `--output` on storage shared by every rank. Rank zero prepares the cache at `--output/.data-cache`, and other ranks memory-map it without copying the full dataset into memory. The cache is for training runtime only and should be excluded from release artifacts. If initialization stops before other run files are written, retrying reuses the completed cache. `--ddp-timeout-seconds` defaults to 7200; increase it if preparing a large dataset takes longer.
 
-The shared [training configuration](../configs/training/lora.yaml) defaults to **one epoch** and controls LoRA rank/alpha/dropout, learning rate, question batch size, gradient accumulation, checkpoint frequency, seed, and token limits. The command above targets KaLM v2.5; use the corresponding model configuration to run Qwen3 0.6B, Qwen3 4B, or E5. Results from the KaLM and Qwen3 0.6B reference runs are linked in the [README](../README.md#lora-fine-tuning).
+The shared [training configuration](../configs/training/lora.yaml) defaults to **one epoch** and controls LoRA rank/alpha/dropout, learning rate, question batch size, gradient accumulation, checkpoint frequency, seed, and token limits. The command above targets KaLM v2.5; use the corresponding model configuration to run Qwen3 0.6B, Qwen3 4B, or E5. The smaller Open-Jev reference runs are documented in the [KaLM](../reports/OPEN_JEV_KALM_LORA.md) and [Qwen3 0.6B](../reports/OPEN_JEV_QWEN3_0.6B_LORA.md) reports.
 
 | Model | Automatic LoRA target suffixes |
 | --- | --- |

@@ -6,12 +6,13 @@
 
 *Choose, score, and judge with your choice of embedding model.*
 
-JevEmbed is a Python framework for embedding-based Choice, Score, and Noul decisions. It provides a Python API, CLI, and optional HTTP server using Jev-style request and response schemas. JevEmbed is an independent implementation.
+JevEmbed is a Python framework that turns embedding models into structured decision engines for Choice, Score, and Noul tasks. It offers a consistent Jev-style interface through a Python API, CLI, and optional HTTP server.
 
 ## News
 
+- **September 26, 2026:** JevEmbed now includes ready-to-use configurations for [JevEmbed-Qwen3-Embedding-0.6B](https://huggingface.co/HIT-TMG/JevEmbed-Qwen3-Embedding-0.6B) and [JevEmbed-KaLM-Embedding-V2.5](https://huggingface.co/HIT-TMG/JevEmbed-KaLM-Embedding-V2.5).
 - **September 25, 2026:** [JevEmbed-KaLM-Embedding-V2.5](https://huggingface.co/HIT-TMG/JevEmbed-KaLM-Embedding-V2.5) is available on Hugging Face with merged weights and a LoRA adapter.
-- **September 24, 2026:** JevEmbed now supports [CLM-v0.1-8B](https://huggingface.co/Contrastive-LM/CLM-v0.1-8B) for Choice, Score, and Noul decisions. See the [CLM setup guide](docs/clm.md).
+- **September 24, 2026:** JevEmbed now supports [CLM-v0.1-8B](https://huggingface.co/Contrastive-LM/CLM-v0.1-8B) for Choice, Score, and Noul decisions. See the [CLM-v0.1-8B setup guide](docs/clm.md).
 - **September 24, 2026:** [JevEmbed-Data](https://huggingface.co/datasets/HIT-TMG/JevEmbed-Data) is available for fine-tuning, with 1.67 million labeled Choice, Score, and Noul questions.
 
 ## Installation
@@ -26,7 +27,7 @@ python -m pip install -r requirements.txt
 python -m pip install -e . --no-deps
 ```
 
-`requirements.txt` installs dependencies for local inference, the HTTP client, and the HTTP server. It automatically applies the version constraints in `requirements-models-tested.txt`; no separate installation is needed. Contributors can additionally install `requirements-dev.txt` for testing and packaging.
+`requirements.txt` includes local inference and HTTP dependencies with the constraints in `requirements-models-tested.txt`. Contributors can install `requirements-dev.txt` for testing and packaging.
 
 | Dependency | Purpose |
 | --- | --- |
@@ -39,7 +40,7 @@ python -m pip install -e . --no-deps
 | FastAPI | Expose the Jev-shaped HTTP API |
 | Uvicorn | Run the HTTP server |
 
-The tested model stack uses PyTorch 2.8.0, Transformers 4.51.0, sentence-transformers 5.3.0, NumPy 1.26.4, and PyYAML 6.0.3. The Transformers version is pinned for compatibility with KaLM's custom implementation. Select a PyTorch wheel suitable for your hardware and driver. CPU inference is supported without FlashAttention.
+The tested stack uses PyTorch 2.8.0, Transformers 4.51.0, sentence-transformers 5.3.0, NumPy 1.26.4, and PyYAML 6.0.3. Transformers 4.51.0 is pinned for KaLM-embedding-multilingual-mini-instruct-v2.5 compatibility. Choose a PyTorch wheel for your hardware; CPU inference needs no FlashAttention.
 
 For a minimal installation, select the required optional dependencies:
 
@@ -50,11 +51,11 @@ python -m pip install -e '.[local]' -c requirements-models-tested.txt
 python -m pip install -r requirements-dev.txt     # Tests and builds, without model libraries
 ```
 
-Importing the core package and running `--explain` do not load weights, access a GPU, or connect to a model service.
+Core imports and `--explain` require no model weights or service.
 
 ## Supported models
 
-The provided configurations use Hugging Face repository IDs. Weights are downloaded on first inference if unavailable in the local cache; they are distributed separately from this project.
+Configurations use Hugging Face repository IDs; weights download on first inference if absent from the local cache.
 
 | JevEmbed ID / configuration filename | Weight repository | Dimensions | Token limit | Pooling |
 | --- | --- | --- | --- | --- |
@@ -64,12 +65,16 @@ The provided configurations use Hugging Face repository IDs. Weights are downloa
 | `qwen3-embedding-8b` | `Qwen/Qwen3-Embedding-8B` | 4096 | 32768 | Last-token |
 | `multilingual-e5-large-instruct` | `intfloat/multilingual-e5-large-instruct` | 1024 | 512 | Mean |
 | `clm-v0.1-8b` | `Contrastive-LM/CLM-v0.1-8B` projection heads + `Qwen/Qwen3-8B` encoder | 512 | 2048 | Last-token + paired heads |
+| [`jevembed-kalm-embedding-v2.5`](configs/jevembed-kalm-embedding-v2.5.yaml) | [HIT-TMG/JevEmbed-KaLM-Embedding-V2.5](https://huggingface.co/HIT-TMG/JevEmbed-KaLM-Embedding-V2.5) | 896 | 1024 | Mean |
+| [`jevembed-qwen3-embedding-0.6b`](configs/jevembed-qwen3-embedding-0.6b.yaml) | [HIT-TMG/JevEmbed-Qwen3-Embedding-0.6B](https://huggingface.co/HIT-TMG/JevEmbed-Qwen3-Embedding-0.6B) | 1024 | 1024 | Last-token |
 
-Configurations are stored in `configs/<model-id>.yaml`. Each full repository ID is registered as an alias, while responses use the canonical short ID. Unknown model IDs are rejected. `jev-latest` is not registered automatically.
+Configurations are in `configs/<model-id>.yaml`. Repository IDs work as aliases; responses use the short ID. Unknown IDs, including `jev-latest`, are rejected.
 
-KaLM explicitly enables `trust_remote_code: true` to load its repository-provided Python implementation. Qwen3, E5, and CLM use `false`. A loading failure never enables trust or changes pooling automatically. Pin a revision and preserve dependency and template versions when reproducing results.
+The JevEmbed releases are fine-tuned for Choice, Score, and Noul and use 1,024-token truncation.
 
-CLM uses a separate state/action projection pair and a [model-specific prompt configuration](configs/clm-v0.1-8b.yaml). Its Choice/Score temperature is 0.01 and its Noul slope is 100, matching the checkpoint's capped logit scale. The other configurations retain their existing prompts and scoring defaults. See the [CLM guide](docs/clm.md) for setup.
+KaLM-embedding-multilingual-mini-instruct-v2.5 requires `trust_remote_code: true`. Qwen3-Embedding-0.6B, Qwen3-Embedding-4B, Qwen3-Embedding-8B, multilingual-e5-large-instruct, and CLM-v0.1-8B use `false`. Loading failures do not change trust or pooling settings. Pin revisions and dependency versions to reproduce results.
+
+CLM-v0.1-8B uses separate state/action projections and [model-specific prompts](configs/clm-v0.1-8b.yaml), with Choice/Score temperature 0.01 and Noul slope 100. See the [CLM-v0.1-8B guide](docs/clm.md).
 
 ## Quick start
 
@@ -78,68 +83,38 @@ python -m jevembed --config configs/kalm-embedding-v2.5.yaml \
   --input examples/official_choice_exchange.json
 ```
 
-Repeat `--config` to register multiple models. When switching models, also change the request's `model` field. `--input -` reads JSON from standard input; output goes to standard output unless a file is specified.
+Repeat `--config` for multiple models and set the request's `model` field to the selected ID. `--input -` reads standard input.
 
-The shared [examples](examples/README.md) cover Choice, Score, and Noul with and without supplied criteria. They default to KaLM and work with every supported model by changing only `model` and the selected configuration.
+For JevEmbed-Qwen3-Embedding-0.6B, use `--config configs/jevembed-qwen3-embedding-0.6b.yaml` with `"model": "jevembed-qwen3-embedding-0.6b"`. JevEmbed-KaLM-Embedding-V2.5 uses its [configuration](configs/jevembed-kalm-embedding-v2.5.yaml) and `jevembed-kalm-embedding-v2.5` ID.
 
-On POSIX systems, `bash scripts/run_local.sh ...` runs from a source checkout using the current environment's `python3`. Set `JEVEMBED_PYTHON=python` to choose another interpreter. The script sets the project import path and runs the CLI.
+The shared [examples](examples/README.md) cover all three tasks. To try another model, replace `"model": "kalm-embedding-v2.5"` in the request and select the matching configuration. The [local runner](scripts/run_local.sh) is available for source checkouts.
 
-## Official Jev examples with KaLM results
+## Official Jev examples with kalm-embedding-v2.5 results
 
-The following requests reproduce the Jev documentation examples, changing only `model` to `kalm-embedding-v2.5`. The responses are JevEmbed predictions using KaLM. Outputs from the Jev documentation are included for reference.
+These Jev documentation examples use `model: kalm-embedding-v2.5`. The saved Jev outputs appear alongside KaLM-embedding-multilingual-mini-instruct-v2.5 predictions for reference.
 
 ### Evaluation settings
 
-Model inference used CPU FP32 with caching disabled. The results below use these prompt and scoring settings from the [KaLM configuration](configs/kalm-embedding-v2.5.yaml):
-
-```yaml
-scoring:
-  choice_temperature: 0.1
-  score_temperature: 0.1
-  noul_with_criteria: {slope: 10.0, intercept: 0.0}
-  noul_without_criteria: {slope: 10.0, intercept: 0.0}
-  confidence: normalized_entropy
-  calibration_status: uncalibrated
-```
-
-| Setting | Applies to | Scoring behavior |
-| --- | --- | --- |
-| `choice_temperature: 0.1` | Exchange routing | Probabilities are `softmax(cosine / T)`. Temperature changes concentration without changing the similarity ranking or winning choice. |
-| `score_temperature: 0.1` | Safari severity | Uses the same softmax with an independent T. Changing T can change the expected score; level rankings stay the same. |
-| Noul input encoding | Both Noul questions | Encodes every input as a query under `Retrieve semantically similar text.` |
-| `noul_with_criteria: {slope: 10, intercept: 0}` | Repeat contact | Compares the question-plus-state query with `true: criterion` and `false: criterion` queries, then uses `sigmoid((s_true - s_false) / 0.1)`. |
-| `noul_without_criteria: {slope: 10, intercept: 0}` | Human escalation | Compares the question query with the state query, then uses `sigmoid(cosine / 0.1)`. |
-| `confidence: normalized_entropy` | Choice and Score | Measures distribution concentration. A sharper distribution can raise confidence without improving correctness. |
-
-**These results are uncalibrated.** Temperature 0.1 sharpens Choice and Score distributions while preserving similarity rankings. Noul uses the corresponding slope of 10 on a single similarity or a true-minus-false difference. Changing Choice/Score temperature alone does not change Noul. No parameters were fitted to these examples.
-
-Small numerical differences can occur with different hardware, precision, or model revisions. See [input mapping and scoring](#input-mapping-and-scoring) for the calculation steps and [calibration](docs/calibration.md) for fitting guidance.
+Inference used CPU FP32 with caching disabled. The [KaLM-embedding-multilingual-mini-instruct-v2.5 configuration](configs/kalm-embedding-v2.5.yaml) sets Choice/Score temperature **0.1** and Noul slope **10**, intercept **0**, for both Noul paths. Choice/Score probabilities use softmax over cosine similarities; Noul applies a sigmoid to one similarity or a true-minus-false difference. Normalized-entropy confidence measures distribution concentration. **These predictions are uncalibrated** and may vary slightly by hardware, precision, or revision. See [input mapping and scoring](#input-mapping-and-scoring) and [calibration](docs/calibration.md).
 
 ### Example results
 
-| Example | Jev reference output | JevEmbed with KaLM v2.5 |
+| Example | Jev reference output | JevEmbed with KaLM-embedding-multilingual-mini-instruct-v2.5 |
 | --- | --- | --- |
 | Choice: exchange routing | `returns`, probability 1.0 | `returns`, probability 0.793768 |
 | Score: Safari bug severity | 1.43 | 1.256149 |
 | Noul: human escalation | 0.99 | 0.999815 |
 | Noul: repeat contact | 0.93 | 0.520574 |
 
-Reference outputs are taken from the saved Jev documentation examples, rather than new API calls. Both columns contain model predictions, not independently annotated ground truth. These examples illustrate API behavior and do not constitute an accuracy benchmark.
+The reference outputs are saved Jev documentation predictions. Neither column is ground truth; these examples illustrate behavior, not accuracy.
 
-The same requests were run on all supported models with CUDA BF16; see the [example results](examples/README.md).
+The same requests were run on the six original base models with CUDA BF16; see the [example results](examples/README.md).
 
 ### Choice: route an exchange request
 
 Source: [Jev Choice example](https://docs.typesafe.ai/primitives/choice). Saved [official reference response](tests/fixtures/official_choice_exchange.reference.json).
 
-Run the [request file](examples/official_choice_exchange.json):
-
-```bash
-python -m jevembed --config configs/kalm-embedding-v2.5.yaml \
-  --input examples/official_choice_exchange.json
-```
-
-Request:
+Request ([file](examples/official_choice_exchange.json)):
 
 ```json
 {
@@ -159,7 +134,7 @@ Request:
 }
 ```
 
-KaLM response:
+KaLM-embedding-multilingual-mini-instruct-v2.5 response:
 
 ```json
 {
@@ -183,20 +158,11 @@ KaLM response:
 }
 ```
 
-KaLM selects `returns` and retains the probability distribution over all candidates.
-
 ### Score: assess a Safari bug
 
 Source: [Jev Score example](https://docs.typesafe.ai/primitives/score). Saved [official reference response](tests/fixtures/official_score_safari.reference.json).
 
-Run the [request file](examples/official_score_safari.json):
-
-```bash
-python -m jevembed --config configs/kalm-embedding-v2.5.yaml \
-  --input examples/official_score_safari.json
-```
-
-Request:
+Request ([file](examples/official_score_safari.json)):
 
 ```json
 {
@@ -216,7 +182,7 @@ Request:
 }
 ```
 
-KaLM response:
+KaLM-embedding-multilingual-mini-instruct-v2.5 response:
 
 ```json
 {
@@ -245,20 +211,11 @@ KaLM response:
 }
 ```
 
-KaLM ranks the levels as 1 > 2 > 0. The predicted score, 1.256149, is the probability-weighted level index on the 0–2 scale. The response retains the full distribution and legend for interpretation.
-
 ### Noul: human escalation and repeat contact
 
 Source: [Jev Noul example](https://docs.typesafe.ai/primitives/noul). Saved [official reference response](tests/fixtures/official_noul_escalation.reference.json).
 
-Run the [request file](examples/official_noul_escalation.json):
-
-```bash
-python -m jevembed --config configs/kalm-embedding-v2.5.yaml \
-  --input examples/official_noul_escalation.json
-```
-
-Request:
+Request ([file](examples/official_noul_escalation.json)):
 
 ```json
 {
@@ -281,7 +238,7 @@ Request:
 }
 ```
 
-KaLM response:
+KaLM-embedding-multilingual-mini-instruct-v2.5 response:
 
 ```json
 {
@@ -303,7 +260,7 @@ KaLM response:
 }
 ```
 
-This request covers Noul with and without supplied criteria. Both use the fixed retrieval instruction, but the criteria-free path compares one pair of queries while the criteria path compares true and false similarities. Both outputs exceed 0.5 in this example. A high state/question similarity is not a calibrated probability of agreement.
+The criteria-free path compares the question with the state; the other compares true and false criteria. Both outputs exceed 0.5 here, but high state/question similarity is not a calibrated probability of agreement.
 
 ## Local weights and offline use
 
@@ -355,7 +312,7 @@ Custom backends implement `encode(list[EmbeddingInput]) -> EmbeddingBatch` and c
 
 ## Input mapping and scoring
 
-JevEmbed converts each request into embedding inputs, computes cosine similarities, and applies the scoring rule for the selected primitive. The following cases show the model inputs for the [official examples](#official-jev-examples-with-kalm-results) using the default templates.
+JevEmbed converts each request into embedding inputs, computes cosine similarities, and applies the scoring rule for the selected primitive. The following cases show the model inputs for the [official examples](#official-jev-examples-with-kalm-embedding-v25-results) using the default templates.
 
 ### Choice — select a candidate
 
@@ -376,7 +333,7 @@ billing: Charges, invoices, payment problems
 
 **Scoring:** compare the query with each candidate, apply `softmax(similarities / temperature)`, and select the candidate with the highest probability. A null description uses the candidate name alone.
 
-**KaLM result:** `returns`, probability **0.793768** at temperature **0.1**.
+**KaLM-embedding-multilingual-mini-instruct-v2.5 result:** `returns`, probability **0.793768** at temperature **0.1**.
 
 ### Score — estimate an ordinal value
 
@@ -397,7 +354,7 @@ Blocking issue; no workaround exists
 
 **Scoring:** apply softmax and compute the expected level index: `score = 0*p0 + 1*p1 + 2*p2`. For K levels, the prediction ranges from 0 to K−1.
 
-**KaLM result:** probabilities approximately **[0.153769, 0.436313, 0.409918]**, giving a score of **1.256149** at temperature **0.1**. The response also retains the descriptions as its legend.
+**KaLM-embedding-multilingual-mini-instruct-v2.5 result:** probabilities approximately **[0.153769, 0.436313, 0.409918]**, giving a score of **1.256149** at temperature **0.1**. The response also retains the descriptions as its legend.
 
 ### Noul with criteria — compare the question and state with each criterion
 
@@ -423,7 +380,7 @@ Query: false: No sign of any previous contact
 
 **Scoring:** compare the question-plus-state query with each criterion query, subtract the false similarity from the true similarity, and apply `sigmoid(difference / 0.1)`.
 
-**KaLM result:** **0.520574** with slope **10.0** and intercept **0.0**. The true and false similarities were **0.756465** and **0.748231**; the margin is small, so this single result does not establish reliable repeat-contact detection.
+**KaLM-embedding-multilingual-mini-instruct-v2.5 result:** **0.520574** with slope **10.0** and intercept **0.0**. The true and false similarities were **0.756465** and **0.748231**; the margin is small, so this single result does not establish reliable repeat-contact detection.
 
 ### Noul without criteria — compare two queries
 
@@ -441,17 +398,11 @@ Query: I have asked three times now. Can I please just talk to a real person?
 
 **Scoring:** use `sigmoid(cosine(question, state) / 0.1)`. There is no negative comparison in this path, so semantic relevance alone can produce a high score.
 
-**KaLM result:** **0.999815** with slope **10.0** and intercept **0.0**. The high value reflects semantic similarity between the state and question; this path has no negative comparison and can also score related negative cases highly.
+**KaLM-embedding-multilingual-mini-instruct-v2.5 result:** **0.999815** with slope **10.0** and intercept **0.0**. The high value reflects semantic similarity between the state and question; this path has no negative comparison and can also score related negative cases highly.
 
 ### Interpreting outputs
 
-- **Temperature** defaults to **0.1** for Choice and Score. Lower values sharpen probabilities without improving the similarity ranking.
-- **Slope and intercept** control Noul. Both paths default to slope **10** and intercept **0**; slope 10 corresponds to temperature 0.1 under `slope = 1/T`. The two paths have separate parameters because one scores a similarity difference and the other scores a single similarity.
-- **Confidence** describes how concentrated a Choice or Score distribution is, not how likely the answer is to be correct. Noul has no confidence field.
-
-All results above are uncalibrated and rounded for display. Full responses appear in the [official examples](#official-jev-examples-with-kalm-results); detailed formulas and fitting guidance are in [scoring and calibration](docs/calibration.md). Use `--explain` to inspect the exact model inputs for your own request.
-
-For model encoding, device selection, caching, token usage, and input limits, see the [runtime guide](docs/runtime.md).
+Temperature **0.1** sharpens Choice/Score probabilities without changing their ranking. Both Noul paths use slope **10** and intercept **0**, with separate settings for a similarity difference and a single similarity. Confidence measures concentration, not correctness; Noul has no confidence field. See [scoring and calibration](docs/calibration.md) for details, `--explain` for rendered inputs, and the [runtime guide](docs/runtime.md) for model and cache behavior.
 
 ## HTTP interfaces
 
@@ -459,51 +410,29 @@ For model encoding, device selection, caching, token usage, and input limits, se
 python -m jevembed --config configs/kalm-embedding-v2.5.yaml --serve
 ```
 
-The server binds to `127.0.0.1:8000` by default and provides `POST /v1/systemone` and `GET /v1/models`. HTTP requests require `model`. Validation errors return 422; backend failures return 502, without partial answers. `create_app(client, enable_debug=True)` additionally enables `/debug/explain`.
+The server binds to `127.0.0.1:8000` and provides `POST /v1/systemone` and `GET /v1/models`. HTTP requests require `model`; validation errors return 422 and backend failures 502. Per process, the defaults are 2 MiB, 64 questions, 4096 embedding inputs, four active requests, and a 30-second body read timeout. Size or work violations return 413, excess concurrency 429, and slow uploads 408. The [HTTP guide](docs/http.md) has `curl` and Python examples; [serving limits](docs/runtime.md#http-serving-limits) covers options and concurrency.
 
-By default, each server process accepts at most 2 MiB per request, 64 questions, 4096 compiled embedding inputs, and four active inference requests. Requests exceeding a size or work limit return 413; excess concurrent requests return 429. An upload that takes longer than 30 seconds returns 408. Configure these with `--max-request-bytes`, `--max-questions`, `--max-embedding-inputs`, `--max-concurrent-requests`, and `--body-read-timeout-seconds`. The limits apply only to the HTTP service; the Python API has no fixed Choice candidate cap. See [HTTP serving limits](docs/runtime.md#http-serving-limits) for programmatic configuration and concurrency behavior.
-
-Use [http-example.yaml](configs/http-example.yaml) to connect to an embeddings service. Templates are rendered by the client; the service should not add prompts again. Configure the service to reject overlong inputs before declaring `server_enforces_length: true`. The generic adapter does not support server-owned templates or client-side truncation. It restores vector order from response indices and rejects missing or duplicate indices. Retries are bounded and limited to transient failures. API keys are read from the configured environment variable.
+Use [http-example.yaml](configs/http-example.yaml) to connect to an embeddings service. Templates are rendered by the client; the service must enforce input length before `server_enforces_length: true` is set. The [HTTP guide](docs/http.md#call-an-external-embeddings-service) explains this separate backend.
 
 ## LoRA fine-tuning
 
-Fine-tune the encoder on Jev Choice, Score, and Noul supervision with Sentence Transformers and PEFT. The training path reuses the inference input mappings and scoring, supports soft targets, and saves adapters that load through the same Python API, CLI, and HTTP server.
+JevEmbed fine-tunes Sentence Transformers encoders on Choice, Score, and Noul supervision, including soft targets. The released [JevEmbed-KaLM-Embedding-V2.5](https://huggingface.co/HIT-TMG/JevEmbed-KaLM-Embedding-V2.5) and [JevEmbed-Qwen3-Embedding-0.6B](https://huggingface.co/HIT-TMG/JevEmbed-Qwen3-Embedding-0.6B) models each trained for **one epoch on all 1,601,157 JevEmbed-Data training questions**, then had their LoRA weights merged into standalone models. Both used:
 
-```bash
-python -m pip install -e '.[train]' -c requirements-models-tested.txt
-python -m jevembed.training.open_jev --output artifacts/open-jev
-```
+- BF16 and an effective batch of **512 questions**;
+- LoRA rank **64**, alpha **32**, dropout **0.05**, and `q_proj`/`k_proj`/`v_proj` targets;
+- learning rate **2 × 10⁻⁴** with **10% warmup** and **1,024-token truncation**;
+- Choice/Score temperature **0.1** and Noul slope **10** in the [KaLM-embedding-multilingual-mini-instruct-v2.5](configs/kalm-embedding-v2.5.yaml) and [Qwen3-Embedding-0.6B](configs/qwen3-embedding-0.6b.yaml) base configurations.
 
-The command above downloads the pinned `release-v2-redistributable` subset of [ZefanCai/Open-Jev](https://huggingface.co/datasets/ZefanCai/Open-Jev) and prepares **79,116 training** and **3,723 validation** examples without deduplication. To fine-tune KaLM v2.5 for one epoch with the default LoRA settings:
+Install the training extra with `python -m pip install -e '.[train]' -c requirements-models-tested.txt`. The trainer reads supervised JSONL, so convert the dataset's `train` Parquet rows to the [documented JSONL schema](docs/training.md#supervision-format-and-objectives) and reserve `test` for final evaluation. The [training guide](docs/training.md) covers commands, validation, and adapter inference; the model cards give each release's exact settings.
 
-```bash
-python -m jevembed.training \
-  --config configs/kalm-embedding-v2.5.yaml \
-  --training-config configs/training/lora.yaml \
-  --train-data artifacts/open-jev/train.jsonl \
-  --eval-data artifacts/open-jev/validation.jsonl \
-  --output artifacts/lora/kalm
-```
+On the held-out JevEmbed-Data `test` split, overall hard-label accuracy covers **64,110** of **66,482** questions:
 
-In our [KaLM v2.5 reference run](reports/OPEN_JEV_KALM_LORA.md), we used one epoch, batch size 32, a 1,024-token limit, Choice/Score temperature 0.1, and Noul slope 10. Results compare the base model with the final adapter:
+| Model | Base | After JevEmbed-Data fine-tuning | Change |
+| --- | ---: | ---: | ---: |
+| `KaLM-Embedding/KaLM-embedding-multilingual-mini-instruct-v2.5` | 32.33% | 76.03% | +43.70 pp |
+| `Qwen/Qwen3-Embedding-0.6B` | 33.79% | **82.30%** | +48.51 pp |
 
-| Metric | Base | After LoRA finetuning |
-| --- | ---: | ---: |
-| **Open-Jev validation overall hard-label accuracy (3,495 questions)** | **30.24%** | **76.68% (+46.44 pp)** |
-| Open-Jev validation Choice accuracy (740 hard labels) | 40.95% | 62.84% |
-| Open-Jev validation Score level accuracy (470 hard labels) | 24.26% | 63.62% |
-| Open-Jev validation Noul binary accuracy (2,285 questions) | 28.01% | 83.85% |
-
-We repeated the one-epoch recipe with **Qwen3-Embedding-0.6B** on the same Open-Jev splits. The [Qwen3 reference run](reports/OPEN_JEV_QWEN3_0.6B_LORA.md) compares its base model with the final adapter:
-
-| Metric | Base | After LoRA finetuning |
-| --- | ---: | ---: |
-| **Open-Jev validation overall hard-label accuracy (3,495 questions)** | **30.73%** | **84.06% (+53.33 pp)** |
-| Open-Jev validation Choice accuracy (740 hard labels) | 40.00% | 74.46% |
-| Open-Jev validation Score level accuracy (470 hard labels) | 29.36% | 80.43% |
-| Open-Jev validation Noul binary accuracy (2,285 questions) | 28.01% | 87.92% |
-
-The [training guide](docs/training.md) covers model-specific LoRA targets, token limits, checkpoint resume, and adapter inference.
+The [full test report](reports/JEVEMBED_DATA_TEST.md) gives Choice, Score, and Noul accuracy and error metrics.
 
 ## Development and validation
 
@@ -515,22 +444,22 @@ python -m pytest -q
 python -m build
 ```
 
-The automated test suite uses fixed vectors, mock models, and temporary local HTTP services without downloading model weights. It covers input mapping, scoring, caching, concurrent requests, length limits, backend errors, the CLI, and HTTP interfaces.
-
-Original requests and reference responses are stored in `tests/fixtures/`. Save generated traces under the ignored `artifacts/` directory, as diagnostics may contain local paths.
+Tests use fixtures and mock models without downloading weights. Save generated traces under the ignored `artifacts/` directory.
 
 ## JevEmbed-Data test results
 
-The six supported base models were evaluated without LoRA on the **66,482-question** [JevEmbed-Data](https://huggingface.co/datasets/HIT-TMG/JevEmbed-Data) `test` split. Runs used BF16, each model's configured prompts and scoring, and truncation at 1,024 tokens for KaLM/Qwen3, 512 for E5, or 2,048 for CLM. Accuracy covers the **64,110 hard-labeled** questions; soft-label questions are excluded.
+The six base models and two JevEmbed releases were evaluated on the same **66,482-question** [JevEmbed-Data](https://huggingface.co/datasets/HIT-TMG/JevEmbed-Data) `test` split. Runs used BF16, each model's configured prompts and scoring, and truncation at 1,024 tokens for KaLM-embedding-multilingual-mini-instruct-v2.5, Qwen3-Embedding-0.6B, Qwen3-Embedding-4B, Qwen3-Embedding-8B, and both JevEmbed releases; 512 for multilingual-e5-large-instruct; and 2,048 for CLM-v0.1-8B. Accuracy covers **64,110 hard-labeled** questions; soft labels are excluded. The released models used the JevEmbed-Data training split; the base rows show original weights.
 
 | Model | Choice (17,487) | Score (24,260) | Noul (22,363) | Overall (64,110) |
 | --- | ---: | ---: | ---: | ---: |
 | `KaLM-Embedding/KaLM-embedding-multilingual-mini-instruct-v2.5` | 28.61% | 27.45% | 40.52% | 32.33% |
 | `Qwen/Qwen3-Embedding-0.6B` | 33.02% | 28.56% | 40.05% | 33.79% |
 | `Qwen/Qwen3-Embedding-4B` | 38.11% | 30.55% | 41.09% | 36.29% |
-| `Qwen/Qwen3-Embedding-8B` | 43.20% | 33.49% | 42.57% | **39.30%** |
+| `Qwen/Qwen3-Embedding-8B` | 43.20% | 33.49% | 42.57% | 39.30% |
 | `intfloat/multilingual-e5-large-instruct` | 32.07% | 24.27% | 40.54% | 32.07% |
 | `Contrastive-LM/CLM-v0.1-8B` | 28.59% | 25.85% | 53.74% | 36.33% |
+| [JevEmbed-KaLM-Embedding-V2.5](https://huggingface.co/HIT-TMG/JevEmbed-KaLM-Embedding-V2.5) | 71.05% | 66.17% | 90.61% | 76.03% |
+| [JevEmbed-Qwen3-Embedding-0.6B](https://huggingface.co/HIT-TMG/JevEmbed-Qwen3-Embedding-0.6B) | 84.53% | 69.55% | 94.38% | **82.30%** |
 
 The [full test report](reports/JEVEMBED_DATA_TEST.md) gives the error metrics, denominators, and evaluation command.
 
