@@ -88,6 +88,20 @@ def test_choice_reorder_and_tie():
     assert a2["choice"] == "a" and a2["probabilities"] == a["probabilities"]
 
 
+@pytest.mark.parametrize("backend", ["sentence_transformers", "http"])
+@pytest.mark.parametrize("side", ["query_truncation_side", "document_truncation_side"])
+def test_built_in_backends_reject_unsupported_left_truncation(backend, side):
+    with pytest.raises(ValidationError, match="Left truncation"):
+        ModelConfig(backend=backend, **{side: "left"})
+    assert getattr(ModelConfig(backend=backend), side) == "right"
+
+
+def test_custom_backend_may_define_left_truncation():
+    config = ModelConfig(backend="custom", query_truncation_side="left",
+                         document_truncation_side="left")
+    assert (config.query_truncation_side, config.document_truncation_side) == ("left", "left")
+
+
 def test_choice_requires_candidates_without_fixed_upper_bound(client):
     assert len(client.evaluate(request(criteria={str(i): None for i in range(1024)}))["answers"]["q"]["probabilities"]) == 1024
     with pytest.raises(ValidationError):

@@ -3,14 +3,51 @@ import math
 from pathlib import Path
 
 from sentence_transformers import SentenceTransformerTrainer
+import torch
 
 
 class JevTrainer(SentenceTransformerTrainer):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        # JevLoss returns a microbatch mean and does not consume num_items_in_batch.
-        # Transformers must divide by the gradient-accumulation count itself.
+        # JevLoss returns a mean over questions in the current microbatch.
         self.model_accepts_loss_kwargs = False
+
+    def get_batch_samples(self, epoch_iterator, num_batches, device):
+        # Transformers 4.51 computes the final `num_batches` from the number of
+        # examples rather than the number of microbatches. That can omit the
+        # last microbatch (e.g. 10 rows, batch size 2, accumulation 3). Read up
+        # to the configured group size; the parent stops cleanly at epoch end.
+        batch_samples, _ = super().get_batch_samples(
+            epoch_iterator, self.args.gradient_accumulation_steps, device)
+        # The collator stores one label row per question. Count the whole update
+        # before backward, including a short final microbatch or accumulation group.
+        count = torch.tensor(sum(batch["label"].shape[0] for batch in batch_samples), device=device)
+        if self.args.world_size > 1:
+            count = self.accelerator.reduce(count, reduction="sum")
+        return batch_samples, int(count.item())
+
+    def training_step(self, model, inputs, num_items_in_batch=None):
+        if not num_items_in_batch:
+            raise ValueError("JevTrainer requires the question count for each accumulation group")
+        model.train()
+        if hasattr(self.optimizer, "train") and callable(self.optimizer.train):
+            self.optimizer.train()
+        inputs = self._prepare_inputs(inputs)
+        batch_size = inputs["label"].shape[0]
+        with self.compute_loss_context_manager():
+            loss = self.compute_loss(model, inputs)
+        if self.args.n_gpu > 1:
+            loss = loss.mean()
+        # Accelerate divides backward() by its own accumulation count (normally
+        # one in Transformers 4.51); DDP then averages gradients over ranks.
+        # Undo those divisors and weight by the question count in this update.
+        scale = (self.accelerator.gradient_accumulation_steps * self.args.world_size
+                 * batch_size / num_items_in_batch)
+        self.accelerator.backward(loss * scale)
+        reported_loss = loss.detach() * batch_size
+        if self.args.world_size > 1:
+            reported_loss = self.accelerator.reduce(reported_loss, reduction="sum")
+        return reported_loss / num_items_in_batch
 
     def get_train_dataloader(self):
         dataloader = super().get_train_dataloader()

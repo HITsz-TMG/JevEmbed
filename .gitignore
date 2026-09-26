@@ -16,6 +16,9 @@ venv/
 /artifacts/
 /models/
 /data/
+.data-cache/
+..data-cache.build-*/
+..data-cache.old-*/
 checkpoint-*/
 *.safetensors
 *.bin

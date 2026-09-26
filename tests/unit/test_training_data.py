@@ -97,6 +97,38 @@ def test_repeated_inputs_keep_the_official_training_weight(tmp_path):
         read(tmp_path,[a,b])
 
 
+@pytest.mark.parametrize("answer", [{"choice": "a"}, {"probabilities": {"a": 0.8, "b": 0.2}}])
+def test_reordered_choice_candidates_compare_labels_but_preserve_training_order(tmp_path, answer):
+    first, reordered = record(answer=answer), record(answer=answer)
+    reordered["id"] = "two"
+    reordered["request"]["questions"]["q"]["criteria"] = {"b": "beta", "a": "alpha"}
+
+    examples = read(tmp_path, [first, reordered])
+    assert examples[0].fingerprint == examples[1].fingerprint
+    assert examples[0].plan.labels == ["a", "b"]
+    assert examples[1].plan.labels == ["b", "a"]
+    assert examples[0].target == list(reversed(examples[1].target))
+    assert examples[0].training_row()["target"] == examples[0].target
+    assert examples[1].training_row()["target"] == examples[1].target
+
+    reordered["answers"]["q"] = {"choice": "b"}
+    with pytest.raises(ValidationError, match="Conflicting"):
+        read(tmp_path, [first, reordered])
+
+
+def test_reordered_choice_soft_targets_use_order_independent_normalization(tmp_path):
+    first = record(answer={"probabilities": {"a": 0.1, "b": 0.2, "c": 0.3, "d": 0.4}})
+    first["request"]["questions"]["q"]["criteria"] = {
+        "a": "alpha", "b": "beta", "c": "gamma", "d": "delta"}
+    reordered = json.loads(json.dumps(first))
+    reordered["id"] = "two"
+    reordered["request"]["questions"]["q"]["criteria"] = {
+        "d": "delta", "c": "gamma", "b": "beta", "a": "alpha"}
+    examples = read(tmp_path, [first, reordered])
+    assert examples[0].target == [0.1, 0.2, 0.3, 0.4]
+    assert examples[1].target == [0.4, 0.3, 0.2, 0.1]
+
+
 @pytest.mark.parametrize("options", [{"batch_size":0}, {"lora_rank":True}, {"learning_rate":float("nan")},
                                    {"max_steps":0}, {"target_modules":[]}, {"overflow_policy":"silent"}])
 def test_training_configuration_validation(options):

@@ -163,6 +163,10 @@ class ModelConfig:
                 raise ValidationError(f"Invalid {name}: {getattr(self, name)!r}")
         if self.backend != "paired_projection" and self.pooling != "model_default":
             raise ValidationError("Explicit pooling currently requires the paired_projection backend")
+        if self.backend in ("sentence_transformers", "http") and (
+            self.query_truncation_side == "left" or self.document_truncation_side == "left"
+        ):
+            raise ValidationError("Left truncation requires the paired_projection or custom backend")
         if self.projection_filename and Path(self.projection_filename).name != self.projection_filename:
             raise ValidationError("projection_filename must be a filename, not a path")
         if not self.model_id or not isinstance(self.model_id, str):

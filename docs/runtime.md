@@ -8,7 +8,7 @@ The Sentence Transformers backend loads repository modules, preserving their att
 
 ## Device, precision, and length limits
 
-`device: auto` prefers CUDA and otherwise uses CPU. `dtype: auto` selects bfloat16 on supported CUDA devices and float32 on CPU. E5 uses a 512-token limit, CLM uses 2048, and the other supported configurations use 32768. Overlong inputs fail by default. Explicit `overflow_policy: truncate` enables truncation, recorded in the trace, including cache hits; CLM's configuration enables it with role-specific truncation sides.
+`device: auto` prefers CUDA and otherwise uses CPU. `dtype: auto` selects bfloat16 on supported CUDA devices and float32 on CPU. E5 uses a 512-token limit, CLM uses 2048, and the other supported configurations use 32768. Overlong inputs fail by default. Explicit `overflow_policy: truncate` enables truncation, recorded in the trace, including cache hits. The paired-projection backend supports left or right truncation separately for queries and documents, as CLM's configuration uses. The sentence-transformers and HTTP backends accept only the default right-side setting; custom backends may implement either side.
 
 ## Caching
 
@@ -28,8 +28,9 @@ The optional HTTP server applies these limits per process to both `/v1/systemone
 | Questions per request | 64 | `--max-questions` |
 | Compiled embedding inputs per request | 4096 | `--max-embedding-inputs` |
 | Active inference requests | 4 | `--max-concurrent-requests` |
+| Overall request body read timeout | 30 seconds | `--body-read-timeout-seconds` |
 
-Body bytes are checked while streaming, including when `Content-Length` is missing or incorrect. Embedding input counts include repeated inputs across questions, so they bound the work requested before cache lookup. Size and work violations return HTTP 413. When all inference slots are busy, the server returns HTTP 429 immediately with `Retry-After: 1`; it does not queue more work. Raising `--max-embedding-inputs` permits larger Choice sets without changing the Python API or its schema.
+Body bytes are checked while streaming, including when `Content-Length` is missing or incorrect. The positive, finite body read timeout covers the whole upload, including pauses between chunks; an incomplete upload returns HTTP 408 and releases its request slot. It does not limit inference time. Embedding input counts include repeated inputs across questions, so they bound the work requested before cache lookup. Size and work violations return HTTP 413. When all inference slots are busy, the server returns HTTP 429 immediately with `Retry-After: 1`; it does not queue more work. Raising `--max-embedding-inputs` permits larger Choice sets without changing the Python API or its schema.
 
 For an embedded FastAPI application, pass the same limits explicitly:
 
@@ -38,7 +39,8 @@ from jevembed.server import HTTPServiceLimits, create_app
 
 app = create_app(client, limits=HTTPServiceLimits(max_body_bytes=4 * 1024 * 1024,
                                                   max_embedding_inputs=8192,
-                                                  max_concurrent_requests=8))
+                                                  max_concurrent_requests=8,
+                                                  body_read_timeout_seconds=15))
 ```
 
 Each worker process has its own limit and in-memory cache; multiply the concurrency limit by the number of workers when estimating total model load.

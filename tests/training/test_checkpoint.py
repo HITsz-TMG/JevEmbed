@@ -46,10 +46,12 @@ def test_adapter_checkpoint_restores_parameters_and_accumulation(tmp_path):
     trainer._load_from_checkpoint(checkpoint)
     assert all(torch.equal(p,expected[name]) for name,p in parameters.items())
 
-    # Five questions at batch size two produce three microbatches: both the
-    # full accumulation group and the last single-question batch must run.
-    trainer.train_dataset = Dataset.from_list(rows * 5)
+    # Ten questions at batch size two produce five microbatches. Transformers
+    # 4.51 computes the final fetch length from questions rather than batches;
+    # with accumulation three it otherwise drops the fifth microbatch.
+    trainer.train_dataset = Dataset.from_list(rows * 10)
     trainer.args.per_device_train_batch_size = 2
+    trainer.args.gradient_accumulation_steps = 3
     trainer.args.num_train_epochs = 1
     trainer.args.save_strategy = 'no'
     observed_batch_sizes = []
@@ -62,4 +64,4 @@ def test_adapter_checkpoint_restores_parameters_and_accumulation(tmp_path):
     result = trainer.train()
     assert result.global_step == 2
     assert trainer.state.epoch == pytest.approx(1.0)
-    assert sum(observed_batch_sizes) == 5
+    assert sum(observed_batch_sizes) == 10

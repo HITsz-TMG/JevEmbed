@@ -26,6 +26,8 @@ def main(argv=None):
                         help="Maximum compiled embedding inputs per HTTP request (default: 4096)")
     parser.add_argument("--max-concurrent-requests", type=int, default=4,
                         help="Maximum active HTTP inference requests per process (default: 4)")
+    parser.add_argument("--body-read-timeout-seconds", type=float, default=30.0,
+                        help="Overall HTTP request body read timeout in seconds (default: 30)")
     args = parser.parse_args(argv)
     try:
         client = JevEmbed()
@@ -37,7 +39,8 @@ def main(argv=None):
             limits = HTTPServiceLimits(max_body_bytes=args.max_request_bytes,
                                        max_questions=args.max_questions,
                                        max_embedding_inputs=args.max_embedding_inputs,
-                                       max_concurrent_requests=args.max_concurrent_requests)
+                                       max_concurrent_requests=args.max_concurrent_requests,
+                                       body_read_timeout_seconds=args.body_read_timeout_seconds)
             uvicorn.run(create_app(client, limits=limits), host=args.host, port=args.port)
             return 0
         request = json.loads(sys.stdin.read() if args.input == "-" else Path(args.input).read_text(encoding="utf-8"))

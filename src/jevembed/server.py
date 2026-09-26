@@ -1,4 +1,5 @@
 import json
+import math
 import threading
 from dataclasses import dataclass
 
@@ -14,15 +15,20 @@ class HTTPServiceLimits:
     max_questions: int = 64
     max_embedding_inputs: int = 4096
     max_concurrent_requests: int = 4
+    body_read_timeout_seconds: float = 30.0
 
     def __post_init__(self):
         for name in ("max_body_bytes", "max_questions", "max_embedding_inputs", "max_concurrent_requests"):
             value = getattr(self, name)
             if type(value) is not int or value < 1:
                 raise ValueError(f"{name} must be a positive integer")
+        timeout = self.body_read_timeout_seconds
+        if type(timeout) not in (int, float) or not math.isfinite(timeout) or timeout <= 0:
+            raise ValueError("body_read_timeout_seconds must be a finite positive number")
 
 
 def create_app(client, *, enable_debug=False, limits=None):
+    import anyio
     from fastapi import FastAPI, HTTPException, Request
     from fastapi.responses import JSONResponse
     from starlette.concurrency import run_in_threadpool
@@ -50,10 +56,14 @@ def create_app(client, *, enable_debug=False, limits=None):
             except ValueError:
                 pass  # The streamed byte count remains authoritative.
         raw = bytearray()
-        async for chunk in request.stream():
-            if len(raw) + len(chunk) > limits.max_body_bytes:
-                raise HTTPException(413, detail=f"Request body exceeds {limits.max_body_bytes} bytes")
-            raw.extend(chunk)
+        try:
+            with anyio.fail_after(limits.body_read_timeout_seconds):
+                async for chunk in request.stream():
+                    if len(raw) + len(chunk) > limits.max_body_bytes:
+                        raise HTTPException(413, detail=f"Request body exceeds {limits.max_body_bytes} bytes")
+                    raw.extend(chunk)
+        except TimeoutError as exc:
+            raise HTTPException(408, detail="Request body read timed out") from exc
         try:
             body = json.loads(raw)
         except (ValueError, UnicodeError, RecursionError) as exc:

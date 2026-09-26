@@ -15,7 +15,8 @@ def evaluate(model, examples, config):
     brier, tvd = [], []
     try:
         with torch.no_grad():
-            for example in examples[rank::world_size]:
+            for index in range(rank, len(examples), world_size):
+                example = examples[index]
                 vectors = model.encode(example.texts, prompt="", batch_size=config.batch_size,
                                        convert_to_tensor=True, normalize_embeddings=True,
                                        show_progress_bar=False)

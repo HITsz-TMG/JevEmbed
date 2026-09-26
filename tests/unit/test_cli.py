@@ -31,7 +31,9 @@ def test_cli_passes_http_limits_to_app(monkeypatch):
     monkeypatch.setattr(uvicorn, "run", lambda app, *, host, port: None)
     assert main(["--config", str(ROOT / "configs/kalm-embedding-v2.5.yaml"), "--serve",
                  "--max-request-bytes", "4096", "--max-questions", "2",
-                 "--max-embedding-inputs", "8192", "--max-concurrent-requests", "3"]) == 0
+                 "--max-embedding-inputs", "8192", "--max-concurrent-requests", "3",
+                 "--body-read-timeout-seconds", "2.5"]) == 0
     limits = observed[0]
     assert (limits.max_body_bytes, limits.max_questions, limits.max_embedding_inputs,
             limits.max_concurrent_requests) == (4096, 2, 8192, 3)
+    assert limits.body_read_timeout_seconds == 2.5

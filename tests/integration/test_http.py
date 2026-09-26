@@ -1,5 +1,6 @@
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import replace
+import asyncio
 import json
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import threading
@@ -188,10 +189,92 @@ def test_server_rejects_requests_when_inference_slots_are_busy():
         assert first.result().status_code == 200
 
 
+@pytest.mark.parametrize("path", ["/v1/systemone", "/debug/explain"])
+def test_server_times_out_stalled_body_and_releases_slot(client, path):
+    app = create_app(client, enable_debug=True,
+                     limits=HTTPServiceLimits(max_concurrent_requests=1, body_read_timeout_seconds=0.1))
+    body = {**request(), "model": "test"}
+
+    async def check():
+        stalled = asyncio.Event()
+
+        async def upload():
+            yield b"{"
+            stalled.set()
+            await asyncio.Event().wait()
+
+        async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test") as http:
+            first = asyncio.create_task(http.post(path, content=upload()))
+            try:
+                await asyncio.wait_for(stalled.wait(), 2)
+                busy = await http.post(path, json=body)
+                assert busy.status_code == 429
+                timed_out = await asyncio.wait_for(first, 2)
+                assert timed_out.status_code == 408
+                assert "body" in timed_out.json()["detail"]
+                async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test") as recovered:
+                    assert (await asyncio.wait_for(recovered.post(path, json=body), 2)).status_code == 200
+            finally:
+                if not first.done():
+                    first.cancel()
+                    await asyncio.gather(first, return_exceptions=True)
+
+    asyncio.run(check())
+
+
+def test_server_body_timeout_is_overall_not_per_chunk(client):
+    app = create_app(client, limits=HTTPServiceLimits(body_read_timeout_seconds=0.08))
+    body = json.dumps({**request(), "model": "test"}).encode()
+
+    async def upload():
+        for byte in body:
+            yield bytes([byte])
+            await asyncio.sleep(0.02)
+
+    async def check():
+        async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test") as http:
+            response = await asyncio.wait_for(http.post("/v1/systemone", content=upload()), 2)
+            assert response.status_code == 408
+            async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test") as recovered:
+                assert (await asyncio.wait_for(recovered.post("/v1/systemone", json={**request(), "model": "test"}), 2)).status_code == 200
+
+    asyncio.run(check())
+
+
+def test_server_cancelled_upload_releases_slot(client):
+    app = create_app(client, limits=HTTPServiceLimits(max_concurrent_requests=1, body_read_timeout_seconds=5))
+    body = {**request(), "model": "test"}
+
+    async def check():
+        stalled = asyncio.Event()
+
+        async def upload():
+            yield b"{"
+            stalled.set()
+            await asyncio.Event().wait()
+
+        async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test") as http:
+            first = asyncio.create_task(http.post("/v1/systemone", content=upload()))
+            await asyncio.wait_for(stalled.wait(), 2)
+            first.cancel()
+            with pytest.raises(asyncio.CancelledError):
+                await asyncio.wait_for(first, 2)
+            async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test") as recovered:
+                assert (await asyncio.wait_for(recovered.post("/v1/systemone", json=body), 2)).status_code == 200
+
+    asyncio.run(check())
+
+
 @pytest.mark.parametrize("value", [0, -1, True, 1.5, "4"])
 def test_server_limit_values_must_be_positive_integers(value):
     with pytest.raises(ValueError):
         HTTPServiceLimits(max_concurrent_requests=value)
+
+
+@pytest.mark.parametrize("value", [0, -1, False, float("nan"), float("inf"), -float("inf"), "30"])
+def test_server_body_timeout_must_be_finite_and_positive(value):
+    with pytest.raises(ValueError, match="body_read_timeout_seconds"):
+        HTTPServiceLimits(body_read_timeout_seconds=value)
 
 
 def test_local_embedding_server_over_tcp():

@@ -1,7 +1,6 @@
 """LoRA fine-tuning with SentenceTransformerTrainer and Jev task supervision."""
 import argparse
 from dataclasses import asdict, dataclass, replace
-import hashlib
 import json
 import math
 import os
@@ -9,7 +8,8 @@ from pathlib import Path
 
 from ..config import ModelConfig
 from ..errors import ValidationError
-from .data import check_disjoint, check_lengths_distributed, load_examples
+from .data import check_lengths_distributed
+from .identity import base_artifact_identity, portable_base_reference, validate_resume_manifest
 
 
 @dataclass(frozen=True)
@@ -63,14 +63,6 @@ def write_json(path, data):
     path.write_text(json.dumps(data, ensure_ascii=False, indent=2, allow_nan=False) + "\n", encoding="utf-8")
 
 
-def file_sha256(path):
-    digest = hashlib.sha256()
-    with path.open("rb") as handle:
-        for block in iter(lambda: handle.read(1024 * 1024), b""):
-            digest.update(block)
-    return digest.hexdigest()
-
-
 def main_process_call(process_index, action):
     """Run shared preprocessing once and deliver its result or error to every rank."""
     import torch.distributed as dist
@@ -86,6 +78,40 @@ def main_process_call(process_index, action):
     if payload[0][0] == "error":
         raise ValidationError(payload[0][1])
     return payload[0][1]
+
+
+def all_processes_call(action):
+    """Complete a local cache read on every rank before later collectives run."""
+    import torch.distributed as dist
+    result, error = None, None
+    try:
+        result = action()
+    except Exception as exc:
+        error = f"{type(exc).__name__}: {exc}"
+    if dist.is_available() and dist.is_initialized():
+        errors = [None] * dist.get_world_size()
+        dist.all_gather_object(errors, error)
+        if any(errors):
+            details = "; ".join(f"rank {rank}: {message}" for rank, message in enumerate(errors) if message)
+            raise ValidationError(f"Prepared data cannot be opened on every rank: {details}. "
+                                  "Place --output on storage shared by all ranks")
+    elif error:
+        raise ValidationError(error)
+    return result
+
+
+def check_output_directory(output_dir, resume_from_checkpoint):
+    """Refuse fresh runs in occupied outputs while allowing a cached startup retry."""
+    if resume_from_checkpoint or not output_dir.exists():
+        return
+    entries = list(output_dir.iterdir())
+    if not entries:
+        return
+    if len(entries) == 1 and entries[0].name == ".data-cache":
+        from .prepared import is_valid_prepared
+        if is_valid_prepared(entries[0]):
+            return
+    raise ValidationError("Output directory is not empty; choose a new run or explicitly resume a checkpoint")
 
 
 def select_targets(model, requested):
@@ -109,9 +135,17 @@ def main(argv=None):
     parser.add_argument("--model-path", type=Path, help="Use local base weights without modifying a public config")
     parser.add_argument("--device", choices=["cuda", "cpu"], default="cuda")
     parser.add_argument("--dtype", choices=["float32", "bfloat16"], default="bfloat16")
+    parser.add_argument("--ddp-timeout-seconds", type=int, default=7200,
+                        help="Timeout for distributed preparation and training collectives")
     parser.add_argument("--resume-from-checkpoint", type=Path)
+    parser.add_argument("--allow-unverified-base-resume", action="store_true",
+                        help="Allow a legacy checkpoint whose manifest predates base artifact fingerprints")
     parser.add_argument("--validate-only", action="store_true", help="Check supervision and split overlap without model loading")
     args = parser.parse_args(argv)
+    if args.ddp_timeout_seconds < 1:
+        parser.error("--ddp-timeout-seconds must be positive")
+    if args.allow_unverified_base_resume and not args.resume_from_checkpoint:
+        parser.error("--allow-unverified-base-resume requires --resume-from-checkpoint")
     import yaml
     raw = yaml.safe_load(args.training_config.read_text())
     if not isinstance(raw, dict):
@@ -123,26 +157,24 @@ def main(argv=None):
     config = ModelConfig.load(args.config)
     if config.backend != "sentence_transformers" or config.adapter_name_or_path:
         parser.error("Training requires a base SentenceTransformer configuration; use --resume-from-checkpoint to resume")
-    train = load_examples(args.train_data, config)
-    validation = load_examples(args.eval_data, config) if args.eval_data else []
-    check_disjoint(train, validation)
     if args.validate_only:
         if int(os.environ.get("RANK", "0")) == 0:
-            print(json.dumps({"train_questions": len(train), "validation_questions": len(validation),
+            from .prepared import validate_data
+            metadata = validate_data(args.train_data, args.eval_data, config)
+            print(json.dumps({"train_questions": metadata["train_questions"],
+                              "validation_questions": metadata["validation_questions"],
                               "status": "valid; token lengths not checked without model loading"}))
         return 0
-    if args.output.exists() and any(args.output.iterdir()) and not args.resume_from_checkpoint:
-        parser.error("Output directory is not empty; choose a new run or explicitly resume a checkpoint")
     if args.device == "cpu" and args.dtype != "float32":
         parser.error("CPU training requires --dtype float32")
     import torch
-    from datasets import Dataset
     from peft import LoraConfig, TaskType
     from sentence_transformers import SentenceTransformerTrainingArguments
     from transformers import set_seed
     from ..backends import SentenceTransformersBackend
     from .objective import JevCollator, JevLoss
     from .evaluation import evaluate
+    from .prepared import open_prepared, prepare_data
     from .trainer import JevTrainer
 
     launched_world_size = int(os.environ.get("WORLD_SIZE", "1"))
@@ -170,14 +202,27 @@ def main(argv=None):
         bf16=args.dtype == "bfloat16", fp16=False, use_cpu=args.device == "cpu",
         gradient_checkpointing=settings.gradient_checkpointing,
         gradient_checkpointing_kwargs={"use_reentrant": False},
-        eval_strategy="epoch" if validation else "no", save_strategy="steps", save_steps=settings.save_steps,
+        eval_strategy="epoch" if args.eval_data else "no", save_strategy="steps", save_steps=settings.save_steps,
         save_total_limit=settings.save_total_limit, logging_steps=settings.logging_steps,
         report_to=[], push_to_hub=False, seed=settings.seed, data_seed=settings.seed,
         dataloader_num_workers=0, remove_unused_columns=False,
-        ddp_find_unused_parameters=False)
+        ddp_find_unused_parameters=False, ddp_timeout=args.ddp_timeout_seconds)
     # SentenceTransformerTrainingArguments forces drop_last=True under DDP.
     # JevTrainer pads the distributed batch sampler instead, preserving all rows.
     training_args.dataloader_drop_last = False
+    main_process_call(training_args.process_index,
+                      lambda: check_output_directory(args.output, args.resume_from_checkpoint))
+    cache_dir = args.output / ".data-cache"
+    if training_args.process_index == 0:
+        print("Preparing supervised dataset cache", flush=True)
+    metadata = main_process_call(training_args.process_index,
+                                 lambda: prepare_data(args.train_data, args.eval_data, config, cache_dir))
+    def open_data():
+        train_dataset, eval_dataset, validation = open_prepared(cache_dir, expected_metadata=metadata)
+        if len(train_dataset) != metadata["train_questions"] or len(validation) != metadata["validation_questions"]:
+            raise ValidationError("Prepared dataset counts differ from rank-zero metadata")
+        return train_dataset, eval_dataset, validation
+    train_dataset, eval_dataset, validation = all_processes_call(open_data)
     local_config = replace(config, device=str(training_args.device), dtype=args.dtype, cache_capacity=0,
                            overflow_policy=settings.overflow_policy)
     if args.model_path:
@@ -189,12 +234,23 @@ def main(argv=None):
     model = backend._model
     model.max_seq_length = min(model.max_seq_length, settings.max_input_tokens)
     if training_args.process_index == 0:
-        print(f"Checking all {len(train)} train and {len(validation)} validation questions; "
+        print(f"Checking all {len(train_dataset)} train and {len(validation)} validation questions; "
               f"token limit={model.max_seq_length}", flush=True)
-    lengths = {"train": check_lengths_distributed(model, train, settings.overflow_policy)}
-    if validation:
-        lengths["validation"] = check_lengths_distributed(model, validation, settings.overflow_policy)
+    lengths = {"train": check_lengths_distributed(model, train_dataset, settings.overflow_policy)}
+    if eval_dataset is not None:
+        lengths["validation"] = check_lengths_distributed(model, eval_dataset, settings.overflow_policy)
     targets = select_targets(model, settings.target_modules)
+    if training_args.process_index == 0:
+        print("Fingerprinting the loaded base checkpoint and tokenizer", flush=True)
+    def fingerprint_base():
+        try:
+            return base_artifact_identity(local_config.model_name_or_path, identity["resolved_revision"],
+                                          trust_remote_code=local_config.trust_remote_code)
+        except ValidationError:
+            if args.resume_from_checkpoint and args.allow_unverified_base_resume:
+                return None
+            raise
+    base_artifacts = main_process_call(training_args.process_index, fingerprint_base)
     model.add_adapter(LoraConfig(task_type=TaskType.FEATURE_EXTRACTION, r=settings.lora_rank,
                                 lora_alpha=settings.lora_alpha, lora_dropout=settings.lora_dropout,
                                 target_modules=targets, bias="none"))
@@ -208,11 +264,19 @@ def main(argv=None):
     # Keep PEFT metadata portable even when the base was loaded from a local snapshot.
     model[0].auto_model.peft_config["default"].base_model_name_or_path = config.model_name_or_path
     def prepare_manifest():
+        base_model, base_revision = portable_base_reference(
+            config.model_name_or_path, local_config.model_name_or_path, identity["resolved_revision"])
         manifest = {"training": asdict(settings), "model_id": config.model_id, "scoring": asdict(config.scoring),
                     "prompts": asdict(config.prompts), "target_modules": targets, "lengths": lengths,
-                    "base_revision": identity["resolved_revision"], "base_model": config.model_name_or_path,
-                    "dataset_sha256": {"train": file_sha256(args.train_data),
-                                       "validation": file_sha256(args.eval_data) if args.eval_data else None},
+                    "base_revision": base_revision, "base_model": base_model,
+                    "base_artifacts": base_artifacts,
+                    "model_loading": {"code_revision": config.code_revision,
+                                      "trust_remote_code": config.trust_remote_code,
+                                      "attention_implementation": config.attention_implementation,
+                                      "normalize_embeddings": config.normalize_embeddings,
+                                      "pooling": config.pooling,
+                                      "max_seq_length": model.max_seq_length},
+                    "dataset_sha256": metadata["dataset_sha256"],
                     "dtype": args.dtype, "trainable_parameters": sum(p.numel() for _, p in trainable),
                     "total_parameters": sum(p.numel() for p in model.parameters())}
         if training_args.world_size > 1:
@@ -222,20 +286,22 @@ def main(argv=None):
         args.output.mkdir(parents=True, exist_ok=True)
         manifest_path = args.output / "training_manifest.json"
         if args.resume_from_checkpoint:
-            if not args.resume_from_checkpoint.is_dir() or not manifest_path.exists():
-                raise ValidationError("Resume requires an existing checkpoint and the original output manifest")
-            if json.loads(manifest_path.read_text()) != manifest:
-                raise ValidationError("Resume configuration/data differs from the saved manifest")
+            verified = validate_resume_manifest(
+                manifest_path, args.resume_from_checkpoint, args.output, manifest,
+                allow_unverified_base=args.allow_unverified_base_resume,
+                legacy_base_revision=identity["resolved_revision"],
+                legacy_base_model=config.model_name_or_path)
+            if not verified:
+                print("WARNING: resuming a legacy checkpoint without verified base weights/tokenizer; "
+                      "the loaded base may differ from the original run", flush=True)
         else:
             write_json(manifest_path, manifest)
         return manifest
 
     manifest = main_process_call(training_args.process_index, prepare_manifest)
-    train_dataset = Dataset.from_list([e.training_row() for e in train])
-    del train
     trainer = JevTrainer(model=model, args=training_args,
                       train_dataset=train_dataset,
-                      eval_dataset=Dataset.from_list([e.training_row() for e in validation]) if validation else None,
+                      eval_dataset=eval_dataset,
                       loss=JevLoss(model, config.scoring), data_collator=JevCollator(model))
     if training_args.process_index == 0:
         print("Evaluating the base model on validation data" if validation else "No validation data supplied", flush=True)

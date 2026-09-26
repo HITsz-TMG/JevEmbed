@@ -48,9 +48,10 @@ def _target(plan, answer):
         if not isinstance(value, dict) or set(value) != set(plan.labels):
             raise ValidationError("Target probabilities must contain every candidate label exactly once")
         probs = [_number(value[label], 0, 1) for label in plan.labels]
-        if not math.isclose(sum(probs), 1.0, rel_tol=0, abs_tol=1e-6):
+        total = math.fsum(probs)
+        if not math.isclose(total, 1.0, rel_tol=0, abs_tol=1e-6):
             raise ValidationError("Target probabilities must sum to 1")
-        return 0, [p / sum(probs) for p in probs]
+        return 0, [p / total for p in probs]
     if plan.kind == "choice" and key == "choice" and type(value) is str and value in plan.labels:
         return 0, [float(label == value) for label in plan.labels]
     if plan.kind == "score":
@@ -61,10 +62,12 @@ def _target(plan, answer):
     raise ValidationError(f"Invalid {plan.kind} target: use choice, level, score, or probabilities as appropriate")
 
 
-def load_examples(path, config):
-    examples, ids, seen = [], set(), {}
+def iter_examples(path, config, *, digest=None):
+    """Validate and compile one question at a time, retaining only uniqueness indices."""
+    ids, seen = set(), {}
     adapter = PromptAdapter(config.prompts)
-    for line_number, line in enumerate(_lines(path), 1):
+    count = 0
+    for line_number, line in enumerate(_lines(path, digest=digest), 1):
         if not line.strip():
             continue
         try:
@@ -87,22 +90,64 @@ def load_examples(path, config):
                 content = {"state": request["state"], "question": request["questions"][plan.question_id]}
                 fingerprint = hashlib.sha256(serialize(content).encode()).hexdigest()
                 mode, target = _target(plan, answers[plan.question_id])
-                supervision = (mode, target)
+                # Choice criteria are a mapping: their JSON key order may differ
+                # even when the state/question fingerprint and labels are equal.
+                supervision = (mode, tuple(sorted(zip(plan.labels, target))) if plan.kind == "choice"
+                               else tuple(target))
                 if fingerprint in seen and seen[fingerprint] != supervision:
                     raise ValidationError("Conflicting labels for identical state/question supervision")
                 seen[fingerprint] = supervision
-                examples.append(Example(rid, plan.question_id, group, fingerprint, plan,
-                                        [adapter.render(item) for item in plan.inputs], mode, target))
+                count += 1
+                yield Example(rid, plan.question_id, group, fingerprint, plan,
+                              [adapter.render(item) for item in plan.inputs], mode, target)
         except (ValueError, TypeError, KeyError, ValidationError) as exc:
             raise ValidationError(f"Training data line {line_number}: {exc}") from exc
-    if not examples:
+    if not count:
         raise ValidationError("Training data is empty")
-    return examples
 
 
-def _lines(path):
-    with Path(path).open(encoding="utf-8") as handle:
-        yield from handle
+def load_examples(path, config):
+    """Compatibility API for callers that explicitly need a materialized list."""
+    return list(iter_examples(path, config))
+
+
+def _lines(path, *, digest=None):
+    with Path(path).open("rb") as handle:
+        for raw in handle:
+            if digest is not None:
+                digest.update(raw)
+            yield raw.decode("utf-8")
+
+
+def scan_splits(train_path, eval_path, config, *, on_train=None, on_validation=None):
+    """Stream both splits, reject leakage, and call optional row writers."""
+    train_hash, validation_hash = hashlib.sha256(), hashlib.sha256()
+    record_ids, fingerprints, groups = set(), set(), set()
+    train_count = 0
+    for example in iter_examples(train_path, config, digest=train_hash):
+        train_count += 1
+        if eval_path is not None:
+            record_ids.add(example.record_id)
+            fingerprints.add(example.fingerprint)
+            if example.group is not None:
+                groups.add(example.group)
+        if on_train is not None:
+            on_train(example)
+    validation_count = 0
+    if eval_path is not None:
+        for example in iter_examples(eval_path, config, digest=validation_hash):
+            if example.record_id in record_ids:
+                raise ValidationError("Training and validation overlap in record IDs; use independent splits")
+            if example.fingerprint in fingerprints:
+                raise ValidationError("Training and validation overlap in state/question pairs; use independent splits")
+            if example.group is not None and example.group in groups:
+                raise ValidationError("Training and validation overlap in groups; use independent splits")
+            validation_count += 1
+            if on_validation is not None:
+                on_validation(example)
+    return {"train_questions": train_count, "validation_questions": validation_count,
+            "dataset_sha256": {"train": train_hash.hexdigest(),
+                               "validation": validation_hash.hexdigest() if eval_path is not None else None}}
 
 
 def _unique_keys(pairs):
@@ -124,10 +169,11 @@ def check_disjoint(train, validation):
 
 def check_lengths(model, examples, overflow_policy):
     """Match Transformer.tokenize preprocessing; never truncate without opting in."""
-    counts = {"questions": len(examples), "inputs": 0, "overlong_questions": 0, "overlong_inputs": 0,
+    counts = {"questions": 0, "inputs": 0, "overlong_questions": 0, "overlong_inputs": 0,
               "max_original_tokens": 0, "limit": model.max_seq_length, "overflow_policy": overflow_policy}
     for example in examples:
-        texts = [t.strip() for t in example.texts]
+        counts["questions"] += 1
+        texts = [t.strip() for t in (example["texts"] if isinstance(example, dict) else example.texts)]
         if model[0].do_lower_case:
             texts = [t.lower() for t in texts]
         lengths = [len(ids) for ids in model.tokenizer(texts, truncation=False, padding=False)["input_ids"]]
@@ -150,7 +196,7 @@ def check_lengths_distributed(model, examples, overflow_policy):
     if not dist.is_available() or not dist.is_initialized():
         return check_lengths(model, examples, overflow_policy)
     rank, world_size = dist.get_rank(), dist.get_world_size()
-    local = check_lengths(model, examples[rank::world_size], "truncate")
+    local = check_lengths(model, (examples[i] for i in range(rank, len(examples), world_size)), "truncate")
     counts = torch.tensor([local[key] for key in
                            ("questions", "inputs", "overlong_questions", "overlong_inputs", "max_original_tokens")],
                           dtype=torch.long, device=next(model.parameters()).device)
