@@ -1,0 +1,37 @@
+version: 1
+teacher:
+  base_url: http://127.0.0.1:18081/v1
+  model: Qwen3-8B
+task:
+  id: repeat-contact-messages
+  domain: Customer support messages about previous contact.
+  question_id: is_repeat_contact
+  question:
+    type: noul
+    instructions: Has the customer contacted support about this before?
+    criteria:
+      'true': Mentions a prior attempt, ticket, or that they have asked before
+      'false': No sign of any previous contact
+  state_description: >-
+    One natural customer support message written by the customer. The message
+    may mention a previous conversation, ticket, or lack of prior contact,
+    but must not contain an answer field, label, or task explanation.
+  labeling_guidance: >-
+    Generate varied support situations with both positive and negative
+    answers: prior-contact claims, explicit first-contact statements,
+    negations, and hard negatives such as previous orders or product use
+    without any support contact. Reject messages whose reference to earlier
+    contact is ambiguous.
+    Apply only the fixed question and its criteria.
+  state_schema:
+    type: string
+    minLength: 20
+    maxLength: 600
+generation:
+  count: 10
+  label_quotas: balanced
+  concurrency: 2
+  max_attempts_per_sample: 3
+  verify_labels: true
+  case_types: [standard, negation, boundary, hard_negative]
+  seed: 42

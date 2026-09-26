@@ -1,0 +1,32 @@
+version: 1
+teacher:
+  base_url: http://127.0.0.1:18081/v1
+  model: Qwen3-8B
+task:
+  id: risk-points-demo
+  domain: Illustrative risk score from an explicit point count.
+  question_id: risk
+  question:
+    type: score
+    instructions: >-
+      Read the integer in the state. Choose level 0 for 0 through 3 risk
+      points, level 1 for 4 through 7, and level 2 for 8 through 10.
+    criteria:
+      - Low risk, 0 to 3 points.
+      - Medium risk, 4 to 7 points.
+      - High risk, 8 to 10 points.
+  state_description: >-
+    A single text line in the exact form risk_points: N, where N is an
+    integer from 0 to 10. Do not include the answer or level in the state.
+  labeling_guidance: Follow the point ranges in the question, especially boundaries 3/4 and 7/8.
+  state_schema:
+    type: string
+    pattern: '^risk_points: (?:[0-9]|10)$'
+generation:
+  count: 10
+  label_quotas: balanced
+  concurrency: 2
+  max_attempts_per_sample: 3
+  verify_labels: true
+  case_types: [standard, boundary, hard_negative]
+  seed: 42

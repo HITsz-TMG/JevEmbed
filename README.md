@@ -434,6 +434,10 @@ On the held-out JevEmbed-Data `test` split, overall hard-label accuracy covers *
 
 The [full test report](reports/JEVEMBED_DATA_TEST.md) gives Choice, Score, and Noul accuracy and error metrics.
 
+## Synthetic training data
+
+The [synthesis guide](docs/synthesis.md) shows how to generate hard-labeled Choice, Score, or Noul JSONL for a fixed question using an OpenAI-compatible teacher. It includes four example configs, schema checks, configurable label quotas, a separate teacher label check, optional trusted reference rules, and resumable output. Review the generated data before using it with the trainer.
+
 ## Development and validation
 
 ```bash

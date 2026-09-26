@@ -1,0 +1,37 @@
+version: 1
+teacher:
+  base_url: http://127.0.0.1:18081/v1
+  model: Qwen3-8B
+task:
+  id: dinosaur-runner-demo
+  domain: Illustrative dinosaur runner game.
+  question_id: action
+  question:
+    type: choice
+    instructions: >-
+      Choose Jump if distance_to_obstacle is at most 5.
+      Otherwise choose Keep running.
+    criteria:
+      Jump: null
+      Keep running: null
+  state_description: >-
+    A game snapshot with distance_to_obstacle as the nonnegative integer
+    distance to the next obstacle, in game units. Do not include a chosen
+    action, label, or rationale in the state.
+  labeling_guidance: >-
+    Vary the distance, including 4, 5, and 6 and examples for both actions.
+    Follow the exact threshold stated in the question.
+  state_schema:
+    type: object
+    additionalProperties: false
+    required: [distance_to_obstacle]
+    properties:
+      distance_to_obstacle: {type: integer, minimum: 0, maximum: 100}
+generation:
+  count: 10
+  label_quotas: balanced
+  concurrency: 2
+  max_attempts_per_sample: 3
+  verify_labels: true
+  case_types: [standard, boundary, hard_negative]
+  seed: 42

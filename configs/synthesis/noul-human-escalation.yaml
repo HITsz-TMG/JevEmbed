@@ -1,0 +1,33 @@
+version: 1
+teacher:
+  base_url: http://127.0.0.1:18081/v1
+  model: Qwen3-8B
+task:
+  id: human-escalation-messages
+  domain: Customer support messages about escalation.
+  question_id: is_human_escalation
+  question:
+    type: noul
+    instructions: Is the customer asking for a human agent?
+  state_description: >-
+    One natural customer support message written by the customer. The message
+    can contain requests, complaints, or context, but not an answer field,
+    label, or explanation of the task.
+  labeling_guidance: >-
+    Generate varied support situations with both positive and negative
+    answers: affirmative requests, explicit negations, and hard negatives
+    that mention humans without asking for a human agent. Avoid
+    messages whose referent is too ambiguous to judge from the fixed question.
+    Do not add a new decision rule beyond the question.
+  state_schema:
+    type: string
+    minLength: 20
+    maxLength: 600
+generation:
+  count: 10
+  label_quotas: balanced
+  concurrency: 2
+  max_attempts_per_sample: 3
+  verify_labels: true
+  case_types: [standard, negation, boundary, hard_negative]
+  seed: 42
