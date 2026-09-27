@@ -10,6 +10,7 @@ JevEmbed is a Python framework that turns embedding models into structured decis
 
 ## News
 
+- **September 27, 2026:** Added an interactive [Playground](docs/playground.md) with model comparison and Game Lab.
 - **September 26, 2026:** Added [supervised data synthesis](docs/synthesis.md) for Choice, Score, and Noul, with configurable label quotas.
 - **September 26, 2026:** JevEmbed now includes ready-to-use configurations for [JevEmbed-Qwen3-Embedding-0.6B](https://huggingface.co/HIT-TMG/JevEmbed-Qwen3-Embedding-0.6B) and [JevEmbed-KaLM-Embedding-V2.5](https://huggingface.co/HIT-TMG/JevEmbed-KaLM-Embedding-V2.5).
 - **September 25, 2026:** [JevEmbed-KaLM-Embedding-V2.5](https://huggingface.co/HIT-TMG/JevEmbed-KaLM-Embedding-V2.5) is available on Hugging Face with merged weights and a LoRA adapter.
@@ -412,6 +413,8 @@ python -m jevembed --config configs/kalm-embedding-v2.5.yaml --serve
 ```
 
 The server binds to `127.0.0.1:8000` and provides `POST /v1/systemone` and `GET /v1/models`. HTTP requests require `model`; validation errors return 422 and backend failures 502. Per process, the defaults are 2 MiB, 64 questions, 4096 embedding inputs, four active requests, and a 30-second body read timeout. Size or work violations return 413, excess concurrency 429, and slow uploads 408. The [HTTP guide](docs/http.md) has `curl` and Python examples; [serving limits](docs/runtime.md#http-serving-limits) covers options and concurrency.
+
+Run `python -m jevembed --playground` and open `http://127.0.0.1:8000/playground/` for the optional [Playground](docs/playground.md). It defaults to `Qwen/Qwen3-Embedding-0.6B` and `HIT-TMG/JevEmbed-Qwen3-Embedding-0.6B` from Hugging Face. Compare models, edit and export examples, or let a model play four small pixel games in Game Lab. The UI uses the same model registry and HTTP limits as the API.
 
 Use [http-example.yaml](configs/http-example.yaml) to connect to an embeddings service. Templates are rendered by the client; the service must enforce input length before `server_enforces_length: true` is set. The [HTTP guide](docs/http.md#call-an-external-embeddings-service) explains this separate backend.
 

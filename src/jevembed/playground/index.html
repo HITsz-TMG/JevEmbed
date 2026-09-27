@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#ffffff">
+  <title>Playground · JevEmbed</title>
+  <link rel="stylesheet" href="./style.css">
+  <link rel="stylesheet" href="./games.css">
+  <script type="module" src="./app.js"></script>
+</head>
+<body>
+  <div id="app-shell" class="app-shell">
+    <aside id="module-rail" class="module-rail">
+      <div class="rail-top"><span class="rail-brand">JevEmbed</span><button id="nav-toggle" class="nav-toggle" type="button" aria-expanded="true" aria-controls="module-nav" aria-label="Collapse modules" title="Collapse modules"><svg class="nav-icon-desktop" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2.5"/><path d="M9 4v16"/><path class="nav-chevron-collapse" d="m16 9-3 3 3 3"/><path class="nav-chevron-expand" d="m14 9 3 3-3 3"/></svg><svg class="nav-icon-mobile" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path class="nav-menu-lines" d="M5 9h14M5 15h14"/><path class="nav-close-lines" d="M6 6l12 12M18 6 6 18"/></svg></button></div>
+      <div class="rail-section">WORKSPACE</div>
+      <nav id="module-nav" aria-label="Modules"><ul id="module-list"></ul></nav>
+    </aside>
+    <div class="page-shell">
+    <header class="masthead">
+      <div class="masthead-inner"><div id="module-title" class="brand">Playground</div></div>
+    </header>
+
+    <main role="region" aria-label="Workspace content" tabindex="0">
+      <div class="main-content">
+      <div class="intro">
+        <div>
+          <h1>Turn embeddings into <span>decisions</span></h1>
+          <p id="intro-lede" class="lede">Try a rule and see how the model weighs each option.</p>
+        </div>
+      </div>
+
+      <div id="decision-workspace" class="workspace">
+        <section class="panel editor" aria-labelledby="editor-title">
+          <div class="panel-heading"><span class="panel-eyebrow">01 / INPUT</span><h2 id="editor-title">Set the scene</h2></div>
+          <form id="playground-form" novalidate>
+            <div class="form-row">
+              <div class="field"><label for="preset">Start with</label><div class="select-wrap"><select id="preset"><option value="choice">Choice</option><option value="score">Score</option><option value="noul">Noul</option></select></div></div>
+              <div class="field"><label id="model-label" for="model">Model</label><div class="select-wrap"><select id="model" aria-describedby="model-message"><option value="">Loading models…</option></select></div></div>
+            </div>
+            <p id="model-message" class="field-message" role="status"></p>
+            <div id="compare-model-wrap" class="field compare-model" hidden><label for="compare-model">Model B</label><div class="select-wrap"><select id="compare-model" aria-describedby="model-message"><option value="">Loading models…</option></select></div></div>
+            <div class="field state-field"><div class="label-line"><label for="state">State</label><label class="small-check"><input id="json-state" type="checkbox"><span>JSON</span></label></div><textarea id="state" rows="4" spellcheck="true"></textarea><p class="helper">The message or situation the model will read.</p></div>
+            <div class="field"><label for="instructions">Question</label><textarea id="instructions" rows="2" spellcheck="true"></textarea></div>
+            <div class="field"><div class="label-line"><label id="criteria-label" for="criteria">Choices</label><label class="small-check" id="advanced-wrap"><input id="advanced" type="checkbox"><span>JSON criteria</span></label></div><textarea id="criteria" rows="3" spellcheck="true"></textarea><p id="criteria-hint" class="helper">One per line: label or label: description</p></div>
+
+            <div class="action-row"><button id="run" class="primary-button" type="submit"><span id="run-icon" class="run-icon" aria-hidden="true"><svg viewBox="0 0 16 16" fill="currentColor"><path d="M4.25 2.5a.75.75 0 0 1 1.13-.65l8 5.5a.8.8 0 0 1 0 1.3l-8 5.5a.75.75 0 0 1-1.13-.65z"/></svg></span><span id="run-label">Run example</span></button><button id="stop" class="quiet-button" type="button" hidden>Stop waiting</button><span id="run-status" class="run-status" role="status" aria-live="polite"></span></div>
+          </form>
+        </section>
+
+        <section class="panel results" aria-labelledby="results-title">
+          <div class="panel-heading result-heading"><div><span class="panel-eyebrow">02 / OUTPUT</span><h2 id="results-title">The decision</h2><p id="results-subtitle" class="results-subtitle" hidden>The same input, evaluated by both models.</p></div><div id="view-switch" class="view-switch" role="group" aria-label="Result view" hidden><button id="visual-view" type="button" aria-pressed="true">Visual</button><button id="json-view" type="button" aria-pressed="false">JSON</button></div></div>
+          <div id="busy-indicator" class="busy-indicator" role="status" hidden><span class="busy-spectrum" aria-hidden="true"><i></i><i></i><i></i><i></i></span><span class="busy-copy"><strong id="busy-title">Running model…</strong><small id="busy-context" hidden>Showing the last result below.</small></span></div>
+          <div id="empty-state" class="empty-state"><div class="empty-graphic" aria-hidden="true"><span></span><span></span><span></span></div><h3>Your next decision starts here.</h3><p>Run an example to explore the answer.</p></div>
+          <div id="results-content" hidden>
+            <div id="stale-note" class="notice" hidden>The editor has changed. These results show the last run.</div>
+            <div id="visual-results"><div id="result-list" class="result-list"></div><div id="previous-note" class="previous-note" hidden></div></div>
+            <div id="json-results" class="json-results" hidden></div>
+            <details class="correction"><summary>Correct &amp; export <span class="correction-chevron" aria-hidden="true"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="m5 7.5 5 5 5-5"/></svg></span></summary><div class="correction-body"><p>Add the right answer and keep this example for training.</p><div class="correction-controls"><div class="field"><label for="correct-answer">Correct answer</label><div class="select-wrap"><select id="correct-answer"><option value="">Select an answer</option></select></div></div><button id="export" class="secondary-button" type="button" disabled>Export JSONL <span aria-hidden="true">↗</span></button></div><p id="export-note" class="helper">Exports the last run's input, your correction, and available model predictions.</p></div></details>
+          </div>
+        </section>
+      </div>
+      <section id="game-lab" class="game-lab" aria-label="Game Lab" hidden>
+        <div class="game-lab-heading"><div><h2>Every move is a model decision.</h2><p>Pick a game and an embedding model.</p></div></div>
+        <div class="game-picker" role="group" aria-label="Choose a game">
+          <button type="button" data-game="dino" aria-pressed="true"><span class="game-picker-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path fill="currentColor" d="M12 2h8v2h2v6h-5v2h-2v5H8v-2H5v-2H2v-2h4v2h3v-3h3V2Zm-4 15h4v5H8v-5Zm6-2h3v7h-3v-7Zm2-3h3v2h-3v-2Z"/><path class="pixel-cutout" d="M17 5h2v2h-2zM18 9h4v1h-4z"/></svg></span><span>Dino jump</span></button>
+          <button type="button" data-game="blocks" aria-pressed="false"><span class="game-picker-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path fill="currentColor" d="M9 2h6v6H9zM2 9h6v6H2zM9 9h6v6H9zM16 9h6v6h-6zM9 16h6v6H9zM16 16h6v6h-6z"/></svg></span><span>Tetris</span></button>
+          <button type="button" data-game="snake" aria-pressed="false"><span class="game-picker-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path fill="currentColor" d="M12 2h9v9h-9zM12 10h5v5h-5zM7 10h6v5H7zM7 14h5v6H7zM3 17h5v5H3z"/><rect class="pixel-cutout" x="17" y="5" width="2" height="2"/></svg></span><span>Snake</span></button>
+          <button type="button" data-game="racing" aria-pressed="false"><span class="game-picker-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path fill="currentColor" d="M3 2h18v3H3zM10 5h4v5h2v7h-2v4h6v2H4v-2h6v-4H8v-7h2V5ZM4 8h4v5H4zM16 8h4v5h-4zM3 15h5v5H3zM16 15h5v5h-5z"/><rect class="pixel-cutout" x="11" y="11" width="2" height="3"/></svg></span><span>Racing</span></button>
+        </div>
+        <div class="game-layout">
+          <div class="game-screen-card">
+            <div class="game-screen-top"><span id="game-name">DINO JUMP</span><span id="game-turn">TURN 00 / 12</span></div>
+            <canvas id="game-canvas" width="240" height="144" role="img" aria-label="Current game state"></canvas>
+            <div class="game-screen-bottom"><span id="game-caption">Loading a new run…</span><span class="game-live-dot" aria-hidden="true"></span></div>
+          </div>
+          <div class="game-control-card">
+            <div class="game-control-header"><span class="panel-eyebrow">THE PLAYER</span><h3>Let the model play</h3><p>The selected embedding model chooses every move through JevEmbed.</p></div>
+            <div class="field"><label for="game-model">Model</label><div class="select-wrap"><select id="game-model"><option value="">Loading models…</option></select></div></div>
+            <div class="game-stats"><div><span id="game-score-label">Cacti cleared</span><strong id="game-score">0</strong></div><div><span>Turns played</span><strong id="game-count">0 / 12</strong></div></div>
+            <div class="game-actions"><button id="game-step" class="game-step-button" type="button" disabled>Ask model for next move <span aria-hidden="true">↗</span></button><button id="game-auto" class="game-auto-button" type="button" disabled>Play to the end</button><button id="game-reset" class="game-reset-button" type="button">New run</button><button id="game-stop" class="game-reset-button" type="button" hidden>Stop</button><button id="game-replay" class="game-replay-button" type="button">↺ Replay the same start</button></div>
+            <p id="game-status" class="game-status" role="status" aria-live="polite"></p>
+            <div class="game-decision"><span class="game-result-label">LAST MOVE</span><strong id="game-last-action">—</strong><p id="game-last-event">Choose a model to begin.</p><div id="game-probabilities" class="game-probabilities"></div></div>
+            <details class="game-input"><summary>See what the model reads</summary><pre id="game-input-json"></pre></details>
+          </div>
+        </div>
+      </section>
+      </div>
+    </main>
+    </div>
+  </div>
+</body>
+</html>

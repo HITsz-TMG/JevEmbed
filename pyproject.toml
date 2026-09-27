@@ -26,6 +26,9 @@ jevembed-train = "jevembed.training.run:main"
 [tool.setuptools.packages.find]
 where = ["src"]
 
+[tool.setuptools.package-data]
+jevembed = ["playground/*.html", "playground/*.css", "playground/*.js", "playground/*.mjs"]
+
 [tool.pytest.ini_options]
 pythonpath = ["src"]
 testpaths = ["tests"]

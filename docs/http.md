@@ -4,6 +4,8 @@
 
 JevEmbed can **serve decisions** through its own HTTP API or **call an embeddings service** as a backend. The first accepts Jev Choice, Score, and Noul requests at `/v1/systemone`. The second sends rendered text to an upstream `/v1/embeddings` endpoint; that upstream endpoint is not provided by JevEmbed's decision server.
 
+For a browser interface to the decision server, see the [Playground guide](playground.md).
+
 ## Serve JevEmbed decisions
 
 Install the project as described in the [README](../README.md#installation), then start a server from the repository root:

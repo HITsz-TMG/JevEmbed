@@ -27,7 +27,7 @@ class HTTPServiceLimits:
             raise ValueError("body_read_timeout_seconds must be a finite positive number")
 
 
-def create_app(client, *, enable_debug=False, limits=None):
+def create_app(client, *, enable_debug=False, enable_playground=False, limits=None):
     import anyio
     from fastapi import FastAPI, HTTPException, Request
     from fastapi.responses import JSONResponse
@@ -105,5 +105,43 @@ def create_app(client, *, enable_debug=False, limits=None):
         @app.post("/debug/explain")
         async def explain(request: Request):
             return await admitted_request(request, client.explain)
+
+    if enable_playground:
+        from pathlib import Path
+        from fastapi.responses import RedirectResponse
+        from fastapi.staticfiles import StaticFiles
+        from .games import advance_game, new_game
+
+        @app.get("/playground/api/games/new", include_in_schema=False)
+        def game_new(kind: str = "dino", seed: int = 0):
+            return new_game(kind, seed)
+
+        @app.post("/playground/api/games/step", include_in_schema=False)
+        async def game_step(request: Request):
+            # A game state is tiny; keep this separate from the model request budget.
+            maximum = min(16 * 1024, limits.max_body_bytes)
+            raw = bytearray()
+            try:
+                with anyio.fail_after(limits.body_read_timeout_seconds):
+                    async for chunk in request.stream():
+                        if len(raw) + len(chunk) > maximum:
+                            raise HTTPException(413, detail=f"Game request exceeds {maximum} bytes")
+                        raw.extend(chunk)
+            except TimeoutError as exc:
+                raise HTTPException(408, detail="Game request body read timed out") from exc
+            try:
+                body = json.loads(raw)
+            except (ValueError, UnicodeError, RecursionError) as exc:
+                raise ValidationError("Game request must be valid JSON") from exc
+            if not isinstance(body, dict) or set(body) != {"state", "action"}:
+                raise ValidationError("Game request needs state and action")
+            return advance_game(body["state"], body["action"])
+
+        @app.get("/", include_in_schema=False)
+        async def playground_home():
+            return RedirectResponse("playground/")
+
+        app.mount("/playground", StaticFiles(directory=Path(__file__).parent / "playground", html=True),
+                  name="playground")
 
     return app
