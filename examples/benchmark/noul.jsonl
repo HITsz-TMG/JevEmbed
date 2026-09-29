@@ -1,0 +1,1 @@
+{"id":"human-escalation","request":{"state":"The customer threatens legal action after three failed resolutions.","questions":{"escalate":{"type":"noul","instructions":"This case requires immediate human escalation.","criteria":{"true":"Escalate to a human now","false":"Continue automated handling"}}}},"answers":{"escalate":{"noul":true}},"metadata":{"domain":"customer-support"}}

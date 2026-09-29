@@ -26,4 +26,19 @@ JevEmbed v0.1 implements Jev-shaped JSON contracts based on the [API documentati
 
 The supported model configurations are listed in the [README](../README.md#supported-models). NV-Embed-v2 is not supported.
 
-Optional [LoRA training](training.md) supports the Sentence Transformers models on one or more GPUs; CLM's paired-projection backend is inference-only. Automatic prompt optimization and scalar calibration fitting are not implemented. The [JevEmbed-Data test results](../reports/JEVEMBED_DATA_TEST.md) compare the six base models and two fine-tuned models. Separate [KaLM](../reports/OPEN_JEV_KALM_LORA.md) and [Qwen3 0.6B](../reports/OPEN_JEV_QWEN3_0.6B_LORA.md) reports compare base and LoRA models on Open-Jev validation.
+## Dependencies
+
+| Dependency | Purpose |
+| --- | --- |
+| PyYAML | Load YAML model configurations |
+| NumPy | Handle embedding arrays |
+| PyTorch | Run CPU or CUDA inference |
+| Transformers | Load models and tokenizers |
+| sentence-transformers | Use repository-provided modules, encoding, and pooling |
+| httpx | Call a compatible `/v1/embeddings` service |
+| FastAPI | Expose the Jev-shaped HTTP API |
+| Uvicorn | Run the HTTP server |
+
+The tested stack uses PyTorch 2.8.0, Transformers 4.51.0, sentence-transformers 5.3.0, NumPy 1.26.4, and PyYAML 6.0.3. Transformers 4.51.0 is pinned for KaLM-embedding-multilingual-mini-instruct-v2.5 compatibility. Choose a PyTorch wheel for your hardware; CPU inference needs no FlashAttention.
+
+Optional [LoRA training](training.md) supports the Sentence Transformers models on one or more GPUs; CLM's paired-projection backend is inference-only. Automatic prompt optimization and scalar calibration fitting are not implemented. The [JevEmbed-Data test results](../reports/JEVEMBED_DATA_TEST.md) compare the six base models and three fine-tuned models. Separate [KaLM](../reports/OPEN_JEV_KALM_LORA.md) and [Qwen3 0.6B](../reports/OPEN_JEV_QWEN3_0.6B_LORA.md) reports compare base and LoRA models on Open-Jev validation.

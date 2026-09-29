@@ -1,0 +1,1 @@
+{"id":"game-risk","request":{"state":{"health":35,"ammo":4,"visible_enemies":3},"questions":{"risk":{"type":"score","instructions":"Rate the danger of continuing the fight.","criteria":["Low danger","Moderate danger","High danger","Critical danger"]}}},"answers":{"risk":{"level":3}},"metadata":{"domain":"game-control"}}

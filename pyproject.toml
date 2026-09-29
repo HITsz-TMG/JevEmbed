@@ -21,6 +21,7 @@ test = ["pytest>=8,<10", "httpx>=0.27,<1", "jsonschema>=4.18,<5", "fastapi>=0.11
 
 [project.scripts]
 jevembed = "jevembed.cli:main"
+jevembed-benchmark = "jevembed.benchmark.cli:main"
 jevembed-train = "jevembed.training.run:main"
 
 [tool.setuptools.packages.find]

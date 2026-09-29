@@ -1,0 +1,12 @@
+{
+  "schema_version": "jevembed-benchmark-v1",
+  "name": "example-decisions",
+  "version": "1.0",
+  "split": "test",
+  "description": "Small Choice, Score, and Noul example.",
+  "data": [
+    "choice.jsonl",
+    "score.jsonl",
+    "noul.jsonl"
+  ]
+}
