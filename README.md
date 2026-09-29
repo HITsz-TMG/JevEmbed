@@ -19,6 +19,14 @@ JevEmbed is a Python framework that turns embedding models into structured decis
 - **September 24, 2026:** JevEmbed now supports [CLM-v0.1-8B](https://huggingface.co/Contrastive-LM/CLM-v0.1-8B) for Choice, Score, and Noul decisions. See the [CLM-v0.1-8B setup guide](docs/clm.md).
 - **September 24, 2026:** [JevEmbed-Data](https://huggingface.co/datasets/HIT-TMG/JevEmbed-Data) is available for fine-tuning, with 1.67 million labeled Choice, Score, and Noul questions.
 
+## Playground
+
+Explore Choice, Score, and Noul decisions in the browser, compare models, inspect JSON results, and try model-controlled pixel games in Game Lab.
+
+![JevEmbed Playground showing a Choice decision and its probability distribution](assets/jevembed-playground.png)
+
+Run `python -m jevembed --playground`, then open `http://127.0.0.1:8000/playground/`. See the [Playground guide](docs/playground.md) for model configuration and usage.
+
 ## Installation
 
 Use Python 3.10–3.12 for the tested model stack. Run these commands from the project root:
@@ -146,8 +154,6 @@ python -m jevembed --config configs/kalm-embedding-v2.5.yaml --serve
 ```
 
 The server binds to `127.0.0.1:8000` and provides `POST /v1/systemone` and `GET /v1/models`. HTTP requests require `model`; validation errors return 422 and backend failures 502. Per process, the defaults are 2 MiB, 64 questions, 4096 embedding inputs, four active requests, and a 30-second body read timeout. Size or work violations return 413, excess concurrency 429, and slow uploads 408. The [HTTP guide](docs/http.md) has `curl` and Python examples; [serving limits](docs/runtime.md#http-serving-limits) covers options and concurrency.
-
-Run `python -m jevembed --playground` and open `http://127.0.0.1:8000/playground/` for the optional [Playground](docs/playground.md). It defaults to `Qwen/Qwen3-Embedding-0.6B` and `HIT-TMG/JevEmbed-Qwen3-Embedding-0.6B` from Hugging Face. Compare models, edit and export examples, or let a model play four small pixel games in Game Lab. The UI uses the same model registry and HTTP limits as the API.
 
 Use [http-example.yaml](configs/http-example.yaml) to connect to an embeddings service. Templates are rendered by the client; the service must enforce input length before `server_enforces_length: true` is set. The [HTTP guide](docs/http.md#call-an-external-embeddings-service) explains this separate backend.
 
