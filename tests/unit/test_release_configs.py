@@ -11,6 +11,7 @@ from jevembed import JevEmbed, ModelConfig
 
 @pytest.mark.parametrize("release,base,repo", [
     ("jevembed-qwen3-embedding-0.6b", "qwen3-embedding-0.6b", "JevEmbed-Qwen3-Embedding-0.6B"),
+    ("jevembed-qwen3-embedding-4b", "qwen3-embedding-4b", "JevEmbed-Qwen3-Embedding-4B"),
     ("jevembed-kalm-embedding-v2.5", "kalm-embedding-v2.5", "JevEmbed-KaLM-Embedding-V2.5"),
 ])
 @pytest.mark.parametrize("fixture_name", ["choice_exchange", "score_safari", "noul_escalation"])

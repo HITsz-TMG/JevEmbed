@@ -70,6 +70,7 @@ Configurations use Hugging Face repository IDs; weights download on first infere
 | `clm-v0.1-8b` | `Contrastive-LM/CLM-v0.1-8B` projection heads + `Qwen/Qwen3-8B` encoder | 512 | 2048 | Last-token + paired heads |
 | [`jevembed-kalm-embedding-v2.5`](configs/jevembed-kalm-embedding-v2.5.yaml) | [HIT-TMG/JevEmbed-KaLM-Embedding-V2.5](https://huggingface.co/HIT-TMG/JevEmbed-KaLM-Embedding-V2.5) | 896 | 1024 | Mean |
 | [`jevembed-qwen3-embedding-0.6b`](configs/jevembed-qwen3-embedding-0.6b.yaml) | [HIT-TMG/JevEmbed-Qwen3-Embedding-0.6B](https://huggingface.co/HIT-TMG/JevEmbed-Qwen3-Embedding-0.6B) | 1024 | 1024 | Last-token |
+| [`jevembed-qwen3-embedding-4b`](configs/jevembed-qwen3-embedding-4b.yaml) | [HIT-TMG/JevEmbed-Qwen3-Embedding-4B](https://huggingface.co/HIT-TMG/JevEmbed-Qwen3-Embedding-4B) | 2560 | 1024 | Last-token |
 
 Configurations are in `configs/<model-id>.yaml`. Repository IDs work as aliases; responses use the short ID. Unknown IDs, including `jev-latest`, are rejected.
 
@@ -89,6 +90,8 @@ python -m jevembed --config configs/kalm-embedding-v2.5.yaml \
 Repeat `--config` for multiple models and set the request's `model` field to the selected ID. `--input -` reads standard input.
 
 For JevEmbed-Qwen3-Embedding-0.6B, use `--config configs/jevembed-qwen3-embedding-0.6b.yaml` with `"model": "jevembed-qwen3-embedding-0.6b"`. JevEmbed-KaLM-Embedding-V2.5 uses its [configuration](configs/jevembed-kalm-embedding-v2.5.yaml) and `jevembed-kalm-embedding-v2.5` ID.
+
+For JevEmbed-Qwen3-Embedding-4B, use `--config configs/jevembed-qwen3-embedding-4b.yaml` with `"model": "jevembed-qwen3-embedding-4b"`; `HIT-TMG/JevEmbed-Qwen3-Embedding-4B` and `JevEmbed-Qwen3-Embedding-4B` are aliases.
 
 The shared [examples](examples/README.md) cover all three tasks. To try another model, replace `"model": "kalm-embedding-v2.5"` in the request and select the matching configuration. The [local runner](scripts/run_local.sh) is available for source checkouts.
 
@@ -435,7 +438,8 @@ On the held-out JevEmbed-Data `test` split, overall hard-label accuracy covers *
 | Model | Base | After JevEmbed-Data fine-tuning | Change |
 | --- | ---: | ---: | ---: |
 | `KaLM-Embedding/KaLM-embedding-multilingual-mini-instruct-v2.5` | 32.33% | 76.03% | +43.70 pp |
-| `Qwen/Qwen3-Embedding-0.6B` | 33.79% | **82.30%** | +48.51 pp |
+| `Qwen/Qwen3-Embedding-0.6B` | 33.79% | 82.30% | +48.51 pp |
+| `Qwen/Qwen3-Embedding-4B` | 36.29% | **85.86%** | +49.57 pp |
 
 The [full test report](reports/JEVEMBED_DATA_TEST.md) gives Choice, Score, and Noul accuracy and error metrics.
 
