@@ -111,7 +111,8 @@ def portable_base_reference(public_model_name_or_path, loaded_model_name_or_path
 
 
 def validate_resume_manifest(manifest_path, checkpoint, output, expected, *, allow_unverified_base=False,
-                             legacy_base_revision=None, legacy_base_model=None):
+                             legacy_base_revision=None, legacy_base_model=None,
+                             allow_save_steps_change=False):
     """Return whether the base was verified; always reject foreign checkpoints."""
     checkpoint = Path(checkpoint)
     output = Path(output)
@@ -123,6 +124,15 @@ def validate_resume_manifest(manifest_path, checkpoint, output, expected, *, all
         saved = json.loads(Path(manifest_path).read_text(encoding="utf-8"))
     except (OSError, ValueError) as exc:
         raise ValidationError("Cannot read the original training manifest") from exc
+    if (allow_save_steps_change and isinstance(saved, dict) and isinstance(expected, dict)
+            and isinstance(saved.get("training"), dict)
+            and isinstance(expected.get("training"), dict)
+            and "save_steps" in saved["training"] and "save_steps" in expected["training"]):
+        # Saving frequency changes no weights, optimizer state, or data order.
+        # Keep every other manifest field subject to the usual equality check.
+        expected = dict(expected)
+        expected["training"] = dict(expected["training"])
+        expected["training"]["save_steps"] = saved["training"]["save_steps"]
     if not isinstance(saved, dict) or "base_artifacts" not in saved:
         if not allow_unverified_base:
             raise ValidationError("Cannot safely resume this legacy run: its manifest has no base artifact fingerprint; "

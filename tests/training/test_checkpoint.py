@@ -1,5 +1,6 @@
 """Offline adapter checkpoint round-trip with a tiny randomly initialized encoder."""
 import pytest
+from types import SimpleNamespace
 
 torch = pytest.importorskip("torch")
 pytest.importorskip("peft")
@@ -7,12 +8,23 @@ pytest.importorskip("datasets")
 pytest.importorskip("sentence_transformers")
 
 from peft import LoraConfig, TaskType
-from transformers import BertConfig, BertModel, BertTokenizerFast
-from sentence_transformers import SentenceTransformer, models, SentenceTransformerTrainingArguments
+from transformers import BertConfig, BertModel, BertTokenizerFast, TrainerState
+from sentence_transformers import SentenceTransformer, SentenceTransformerTrainer, models, SentenceTransformerTrainingArguments
 from datasets import Dataset
 from jevembed.config import ScoringConfig
 from jevembed.training.trainer import JevTrainer
 from jevembed.training.objective import JevCollator, JevLoss
+
+
+def test_resume_applies_explicit_save_interval_after_loading_state(monkeypatch):
+    trainer = JevTrainer.__new__(JevTrainer)
+    trainer.state = TrainerState(global_step=1000, max_steps=3128, save_steps=500)
+    trainer.args = SimpleNamespace(save_steps=400)
+    trainer.resume_save_steps_override = True
+    monkeypatch.setattr(SentenceTransformerTrainer, "_load_callback_state", lambda self: None)
+    trainer._load_callback_state()
+    assert trainer.state.save_steps == 400
+    assert trainer.state.global_step == 1000
 
 
 def test_adapter_checkpoint_restores_parameters_and_accumulation(tmp_path):

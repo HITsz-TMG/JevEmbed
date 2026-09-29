@@ -12,6 +12,13 @@ class JevTrainer(SentenceTransformerTrainer):
         # JevLoss returns a mean over questions in the current microbatch.
         self.model_accepts_loss_kwargs = False
 
+    def _load_callback_state(self):
+        super()._load_callback_state()
+        if getattr(self, "resume_save_steps_override", False):
+            # Trainer reloads save_steps=500 from trainer_state.json after it
+            # computes the current arguments. Apply the requested interval here.
+            self.state.save_steps = self.args.save_steps
+
     def get_batch_samples(self, epoch_iterator, num_batches, device):
         # Transformers 4.51 computes the final `num_batches` from the number of
         # examples rather than the number of microbatches. That can omit the

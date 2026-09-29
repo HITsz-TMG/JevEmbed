@@ -140,12 +140,16 @@ def main(argv=None):
     parser.add_argument("--resume-from-checkpoint", type=Path)
     parser.add_argument("--allow-unverified-base-resume", action="store_true",
                         help="Allow a legacy checkpoint whose manifest predates base artifact fingerprints")
+    parser.add_argument("--allow-save-steps-change", action="store_true",
+                        help="On resume, allow only save_steps to differ from the original manifest")
     parser.add_argument("--validate-only", action="store_true", help="Check supervision and split overlap without model loading")
     args = parser.parse_args(argv)
     if args.ddp_timeout_seconds < 1:
         parser.error("--ddp-timeout-seconds must be positive")
     if args.allow_unverified_base_resume and not args.resume_from_checkpoint:
         parser.error("--allow-unverified-base-resume requires --resume-from-checkpoint")
+    if args.allow_save_steps_change and not args.resume_from_checkpoint:
+        parser.error("--allow-save-steps-change requires --resume-from-checkpoint")
     import yaml
     raw = yaml.safe_load(args.training_config.read_text())
     if not isinstance(raw, dict):
@@ -290,7 +294,8 @@ def main(argv=None):
                 manifest_path, args.resume_from_checkpoint, args.output, manifest,
                 allow_unverified_base=args.allow_unverified_base_resume,
                 legacy_base_revision=identity["resolved_revision"],
-                legacy_base_model=config.model_name_or_path)
+                legacy_base_model=config.model_name_or_path,
+                allow_save_steps_change=args.allow_save_steps_change)
             if not verified:
                 print("WARNING: resuming a legacy checkpoint without verified base weights/tokenizer; "
                       "the loaded base may differ from the original run", flush=True)
@@ -303,6 +308,7 @@ def main(argv=None):
                       train_dataset=train_dataset,
                       eval_dataset=eval_dataset,
                       loss=JevLoss(model, config.scoring), data_collator=JevCollator(model))
+    trainer.resume_save_steps_override = args.allow_save_steps_change
     if training_args.process_index == 0:
         print("Evaluating the base model on validation data" if validation else "No validation data supplied", flush=True)
     baseline = evaluate(model, validation, local_config) if validation else None

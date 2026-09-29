@@ -30,6 +30,27 @@ def test_compilation_matches_inference(tmp_path, client):
     assert "choice" not in example.texts
 
 
+def test_optional_metadata_is_accepted_but_never_used_for_training(tmp_path):
+    row = record(answer={"choice": "a"})
+    baseline = read(tmp_path, [row])[0]
+    row["metadata"] = {"predictions": [{"model": "other-model", "prediction": {
+        "type": "choice", "choice": "b", "probabilities": {"a": 0.123456789, "b": 0.876543211}}}],
+        "note": "metadata sentinel"}
+    annotated = read(tmp_path, [row])[0]
+    assert annotated.training_row() == baseline.training_row()
+    assert annotated.fingerprint == baseline.fingerprint
+    assert annotated.target == [1.0, 0.0]
+    assert all("metadata sentinel" not in text for text in annotated.texts)
+
+    row["metadata"] = []
+    with pytest.raises(ValidationError, match="metadata must be a JSON object"):
+        read(tmp_path, [row])
+    row.pop("metadata")
+    row["unexpected"] = True
+    with pytest.raises(ValidationError, match="Record fields"):
+        read(tmp_path, [row])
+
+
 @pytest.mark.parametrize("answer", [{"choice": "missing"}, {"choice": True}, {"choice": "a", "confidence": 1},
                                     {"probabilities": {"a": 0.5}}, {"probabilities": {"a": 1, "b": 1}},
                                     {"probabilities": {"a": float("nan"), "b": 0}}])

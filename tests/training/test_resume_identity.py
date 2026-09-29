@@ -121,6 +121,53 @@ def test_resume_rejects_changed_base_and_legacy_manifest(tmp_path):
                                  allow_unverified_base=True)
 
 
+def test_resume_allows_only_explicit_save_interval_change(tmp_path):
+    output = tmp_path / "run"
+    checkpoint = output / "checkpoint-1000"
+    checkpoint.mkdir(parents=True)
+    manifest_path = output / "training_manifest.json"
+    saved = {"training": {"seed": 42, "save_steps": 500}, "base_revision": "revision"}
+    manifest_path.write_text(json.dumps(saved))
+    requested = {"training": {"seed": 42, "save_steps": 400}, "base_revision": "revision",
+                 "base_artifacts": {"sha256": "fingerprint"}, "model_loading": {}}
+    with pytest.raises(ValidationError, match="legacy run"):
+        validate_resume_manifest(manifest_path, checkpoint, output, requested,
+                                 legacy_base_revision="revision", allow_save_steps_change=True)
+    assert validate_resume_manifest(
+        manifest_path, checkpoint, output, requested, allow_unverified_base=True,
+        legacy_base_revision="revision", allow_save_steps_change=True) is False
+    with pytest.raises(ValidationError, match="saved legacy manifest"):
+        validate_resume_manifest(
+            manifest_path, checkpoint, output,
+            {**requested, "training": {"seed": 43, "save_steps": 400}},
+            allow_unverified_base=True, legacy_base_revision="revision",
+            allow_save_steps_change=True)
+    assert json.loads(manifest_path.read_text()) == saved
+
+
+def test_verified_resume_allows_only_save_interval_change(tmp_path):
+    output = tmp_path / "run"
+    checkpoint = output / "checkpoint-1000"
+    checkpoint.mkdir(parents=True)
+    manifest_path = output / "training_manifest.json"
+    saved = {"training": {"seed": 42, "save_steps": 500},
+             "base_artifacts": {"sha256": "fingerprint"}, "model_loading": {}}
+    manifest_path.write_text(json.dumps(saved))
+    requested = {**saved, "training": {"seed": 42, "save_steps": 400}}
+
+    with pytest.raises(ValidationError, match="configuration/data"):
+        validate_resume_manifest(manifest_path, checkpoint, output, requested)
+    assert validate_resume_manifest(
+        manifest_path, checkpoint, output, requested,
+        allow_save_steps_change=True) is True
+    with pytest.raises(ValidationError, match="configuration/data"):
+        validate_resume_manifest(
+            manifest_path, checkpoint, output,
+            {**requested, "training": {"seed": 43, "save_steps": 400}},
+            allow_save_steps_change=True)
+    assert json.loads(manifest_path.read_text()) == saved
+
+
 def test_resume_rejects_foreign_checkpoint(tmp_path):
     output = tmp_path / "run"
     output.mkdir()

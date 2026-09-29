@@ -107,7 +107,7 @@ The generic recipe caps inputs at **1024 tokens** and truncates longer inputs. T
 
 ## Supervision format and objectives
 
-Each JSONL row contains `id`, optional `group`, a standard Jev `request`, and `answers` keyed by the same question IDs. A request may contain multiple questions; each is one equally weighted training example.
+Each JSONL row contains `id`, optional `group`, a standard Jev `request`, and `answers` keyed by the same question IDs. A request may contain multiple questions; each is one equally weighted training example. Optional `metadata` is ignored by training and may carry predictions from evaluated models.
 
 ```json
 {"id":"route-001","group":"conversation-001","request":{"state":"My parcel has not arrived.","questions":{"route":{"type":"choice","instructions":"Route the support request.","criteria":{"shipping":"Delivery or tracking","billing":"Invoices or payments"}}}},"answers":{"route":{"choice":"shipping"}}}
@@ -156,6 +156,8 @@ python -m jevembed.training \
 ```
 
 Resume requires a `checkpoint-*` directory directly inside the original output directory and matching settings/data, including the GPU count for distributed runs. The manifest also records a SHA-256 fingerprint of the base checkpoint, tokenizer, configuration, and relevant model code files. The fingerprint uses file contents and relative names, so moving a local base snapshot does not change it; changing even one weight or tokenizer file prevents resume. Older manifests lack this verification and are rejected by default. If you must resume one, pass `--allow-unverified-base-resume`; the old manifest fields are still checked, but the original base weights and tokenizer cannot be proven. This flag never bypasses a fingerprint mismatch in a newer manifest. Resume restores the adapter, optimizer, scheduler, and RNG state. Adapter-only inference is different from optimizer-state resume. Use checkpoints produced by your own trusted runs.
+
+To change only the checkpoint saving interval when resuming, update `save_steps` in the training configuration and pass `--allow-save-steps-change`. Every other training, data, model, and distributed setting must still match the original manifest. The requested interval is reapplied after Trainer state is restored.
 
 The final adapter is the final training step, not an automatically selected best checkpoint. Epoch validation reports loss. Final validation additionally reports hard-label accuracy where defined, Score MAE, Noul MAE, and Brier/TVD against target distributions, each with its denominator. Soft targets are not silently converted to hard labels. Without `--eval-data`, no held-out metrics are claimed.
 

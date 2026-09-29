@@ -73,8 +73,11 @@ def iter_examples(path, config, *, digest=None):
         try:
             record = json.loads(line, object_pairs_hook=_unique_keys)
             validate_json(record)
-            if not isinstance(record, dict) or set(record) - {"id", "group", "request", "answers"}:
-                raise ValidationError("Record fields are id, optional group, request, and answers")
+            if not isinstance(record, dict) or set(record) - {"id", "group", "request", "answers", "metadata"}:
+                raise ValidationError("Record fields are id, optional group, request, answers, and optional metadata")
+            if "metadata" in record and not isinstance(record["metadata"], dict):
+                raise ValidationError("metadata must be a JSON object")
+            # Metadata is descriptive only; predictions never enter compilation or targets.
             rid = record.get("id")
             if not isinstance(rid, str) or not rid or rid in ids:
                 raise ValidationError("Record IDs must be unique nonempty strings")
