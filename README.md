@@ -10,6 +10,7 @@ JevEmbed is a Python framework that turns embedding models into structured decis
 
 ## News
 
+- **September 29, 2026:** Added a versioned [benchmark module](docs/benchmark.md) with multi-file JSONL cases, unified Choice/Score/Noul evaluation, and structured JSON results.
 - **September 28, 2026:** Released [JevEmbed-Qwen3-Embedding-4B](https://huggingface.co/HIT-TMG/JevEmbed-Qwen3-Embedding-4B), fine-tuned on JevEmbed-Data, with merged weights and a LoRA adapter.
 - **September 27, 2026:** Added an interactive [Playground](docs/playground.md) with model comparison and Game Lab.
 - **September 26, 2026:** Added [supervised data synthesis](docs/synthesis.md) for Choice, Score, and Noul, with configurable label quotas.
