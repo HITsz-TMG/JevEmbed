@@ -2,7 +2,7 @@
 
 [Back to README](../README.md#http-interfaces)
 
-The Playground is a small browser interface for trying one Jev Choice, Score, or Noul decision at a time. It calls the same `/v1/models` and `/v1/systemone` endpoints as other HTTP clients.
+The Playground is a small browser interface for trying Jev Choice, Score, or Noul decisions. It calls the same `/v1/models` and `/v1/systemone` endpoints as other HTTP clients.
 
 From the project root, install local inference and server dependencies with the [tested model constraints](../README.md#installation):
 
@@ -23,6 +23,8 @@ python -m jevembed \
 Open <http://127.0.0.1:8000/playground/>. `--playground` starts the HTTP server; no JavaScript build is needed. The server binds to `127.0.0.1` by default. Use `--host` and `--port` if needed. Model weights load on the first run for each model and stay resident, so loading both models needs enough memory for both. A first run may also download weights that are not cached locally.
 
 Use **Playground** for one model, or open **Compare models** in the left sidebar to evaluate the same input with two different registered models. The comparison page is also available at `/playground/#/compare` and requires at least two registered models. Switching pages keeps each page's draft and completed results until you reload.
+
+Use **Compose workflow** at `/playground/#/compose` to combine multiple Jev primitives into one request. The editor uses one shared state and lets you add, remove, reorder, and configure Choice, Score, and Noul steps. Each step needs a unique question ID; the preview shows the exact multi-question JSON sent to `/v1/systemone`. **Copy**, **Download**, and **Download JSON Schema** make the configuration reusable from application code. The server evaluates all questions in one request and returns an answer under each step ID.
 
 **Game Lab** at `/playground/#/games` lets a model play four small, monochrome pixel games: Dino jump, Tetris-style falling blocks, Snake, and Racing. Choose a game and model, then step through moves or select **Play to the end** for a complete run. Every move comes from the selected embedding model through the same Choice API; the simulator supplies observations and applies the returned action. The board, move, probabilities, latency, and game score update together. Use **Replay the same start** to try another model on identical initial conditions; **New run** changes the starting seed. Runs stop after at most 12 turns. Falling blocks use fixed piece orientations. Tetris-style blocks and Snake show game outcomes rather than an artificial per-move accuracy label.
 

@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import {buildQuestion, buildRequest, comparison, hardPrediction, scoreSummary, simpleCriteriaText, trainingRecord} from "../../src/jevembed/playground/logic.mjs";
+import {buildQuestion, buildCompositionRequest, buildRequest, comparison, hardPrediction, scoreSummary, simpleCriteriaText, trainingRecord} from "../../src/jevembed/playground/logic.mjs";
 
 const draft = {model: "base", state: "A customer asks for a person", jsonState: false,
   type: "choice", instructions: "Route this", criteria: "human: Needs an agent\nbot: Can self-serve", advanced: false};
@@ -96,4 +96,27 @@ test("Score and Noul exports preserve original numeric predictions", () => {
   const noulRecord = trainingRecord({request: noulRequest, answer: noulPrediction}, "true");
   assert.deepEqual(noulRecord.answers.decision, {noul: true});
   assert.deepEqual(noulRecord.metadata.predictions, [{model: "noul-model", prediction: noulPrediction}]);
+});
+
+test("builds a mixed Choice, Score, and Noul composition for one shared state", () => {
+  const request = buildCompositionRequest({model: "base", state: "A failed export needs review", jsonState: false, steps: [
+    {id: "route", type: "choice", instructions: "Which team?", criteria: "support\nengineering", advanced: false},
+    {id: "severity", type: "score", instructions: "How severe?", criteria: "low\nmedium\nhigh", advanced: false},
+    {id: "escalate", type: "noul", instructions: "Needs a human?", criteria: "", advanced: false},
+  ]});
+  assert.deepEqual(Object.keys(request.questions), ["route", "severity", "escalate"]);
+  assert.equal(request.questions.route.type, "choice");
+  assert.equal(request.questions.severity.type, "score");
+  assert.equal(request.questions.escalate.type, "noul");
+});
+
+test("composition validates unique step IDs and JSON shared state", () => {
+  assert.throws(() => buildCompositionRequest({model: "base", state: "{}", jsonState: true, steps: [
+    {id: "same", type: "noul", instructions: "One", criteria: "", advanced: false},
+    {id: "same", type: "noul", instructions: "Two", criteria: "", advanced: false},
+  ]}), /unique/);
+  const request = buildCompositionRequest({model: "base", state: '{"ticket":7}', jsonState: true, steps: [
+    {id: "triage", type: "noul", instructions: "Escalate?", criteria: "", advanced: false},
+  ]});
+  assert.deepEqual(request.state, {ticket: 7});
 });

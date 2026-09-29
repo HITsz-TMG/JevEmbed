@@ -1,4 +1,4 @@
-import {PRESETS, buildQuestion, buildRequest, comparison, hardPrediction, labelsForQuestion, scoreSummary, simpleCriteriaText, trainingRecord} from "./logic.mjs";
+import {COMPOSITION_SCHEMA, PRESETS, buildQuestion, buildCompositionRequest, buildRequest, comparison, hardPrediction, labelsForQuestion, scoreSummary, simpleCriteriaText, trainingRecord} from "./logic.mjs";
 import {initGames} from "./games.js";
 
 const $ = id => document.getElementById(id);
@@ -18,11 +18,17 @@ const ui = {
   results: document.querySelector(".results"), busy: $("busy-indicator"), busyTitle: $("busy-title"), busyContext: $("busy-context"),
   previous: $("previous-note"), correct: $("correct-answer"), export: $("export"),
   decisionWorkspace: $("decision-workspace"), gameLab: $("game-lab"), gameModel: $("game-model"),
+  compositionWorkspace: $("composition-workspace"), compositionModel: $("composition-model"), compositionState: $("composition-state"),
+  compositionJsonState: $("composition-json-state"), compositionSteps: $("composition-steps"), compositionStepCount: $("composition-step-count"),
+  compositionStatus: $("composition-status"), compositionJson: $("composition-json"), addStep: $("add-step"), runComposition: $("run-composition"),
+  copyComposition: $("copy-composition"), downloadComposition: $("download-composition"), downloadSchema: $("download-schema"), compositionTemplate: $("composition-template"),
+  compositionResponseWrap: $("composition-response-wrap"), compositionResponse: $("composition-response"), copyCompositionResponse: $("copy-composition-response"),
 };
 
 const MODULES = [
   {id: "playground", label: "Playground", href: "#/playground"},
   {id: "compare", label: "Compare models", href: "#/compare"},
+  {id: "compose", label: "Compose workflow", href: "#/compose"},
   {id: "games", label: "Game Lab", href: "#/games"},
 ];
 const mobileNavQuery = window.matchMedia("(max-width: 900px)");
@@ -49,11 +55,21 @@ const comboboxes = new Map();
 const games = initGames();
 let openCombobox = null;
 let lastPointerPosition = null;
+const defaultCompositionSteps = () => [
+  {id: "route", type: "choice", instructions: "Which team should handle this request?", criteria: "support: General support\nengineering: Technical issue\naccount: Billing or account", advanced: false},
+  {id: "severity", type: "score", instructions: "How severe is the request?", criteria: "Low impact\nNeeds attention\nBlocking", advanced: false},
+  {id: "escalate", type: "noul", instructions: "Should a human agent review this request?", criteria: "", advanced: false},
+];
+let compositionSteps = defaultCompositionSteps();
+let compositionRequest = null;
+let compositionResponse = null;
+let compositionController = null;
 
 function routeFromHash() { return location.hash === "#/compare" ? "compare" :
-  location.hash === "#/games" ? "games" : "playground"; }
+  location.hash === "#/compose" ? "compose" : location.hash === "#/games" ? "games" : "playground"; }
 function isCompare() { return activePage === "compare"; }
 function isGame() { return activePage === "games"; }
+function isCompose() { return activePage === "compose"; }
 
 function cancelAnimations() {
   for (const animation of animations) animation.cancel();
@@ -177,8 +193,7 @@ function restore(page) {
 
 function applyRoute(focus = false) {
   closeCombobox();
-  if (location.hash && location.hash !== "#/playground" && location.hash !== "#/compare" &&
-      location.hash !== "#/games") {
+  if (location.hash && !["#/playground", "#/compare", "#/compose", "#/games"].includes(location.hash)) {
     history.replaceState(null, "", `${location.pathname}${location.search}#/playground`);
   }
   const page = routeFromHash();
@@ -198,16 +213,18 @@ function applyRoute(focus = false) {
   routeInitialized = true;
   ui.appShell.classList.toggle("compare-page", isCompare());
   ui.appShell.classList.toggle("game-page", isGame());
-  ui.decisionWorkspace.hidden = isGame();
+  ui.appShell.classList.toggle("compose-page", isCompose());
+  ui.decisionWorkspace.hidden = isGame() || isCompose();
   ui.gameLab.hidden = !isGame();
+  ui.compositionWorkspace.hidden = !isCompose();
   for (const link of ui.moduleList.querySelectorAll(".module-link")) {
     if (link.dataset.module === page) link.setAttribute("aria-current", "page");
     else link.removeAttribute("aria-current");
   }
-  ui.moduleTitle.textContent = isGame() ? "Game Lab" : isCompare() ? "Compare models" : "Playground";
+  ui.moduleTitle.textContent = isGame() ? "Game Lab" : isCompose() ? "Compose workflow" : isCompare() ? "Compare models" : "Playground";
   document.title = `${ui.moduleTitle.textContent} · JevEmbed`;
   ui.introLede.textContent = isGame() ? "See how a model plays four tiny pixel games, one turn at a time." :
-    isCompare() ? "See how two models answer the same question." : "Try a rule and see how the model weighs each option.";
+    isCompose() ? "Combine Jev primitives into one reusable decision workflow." : isCompare() ? "See how two models answer the same question." : "Try a rule and see how the model weighs each option.";
   if (isGame()) {
     games.show();
     if (focus) {
@@ -215,6 +232,10 @@ function applyRoute(focus = false) {
       heading.tabIndex = -1;
       heading.focus({preventScroll: true});
     }
+    return;
+  }
+  if (isCompose()) {
+    renderComposition();
     return;
   }
   ui.modelLabel.textContent = isCompare() ? "Model A" : "Model";
@@ -336,7 +357,7 @@ function openComboboxMenu(data) {
 }
 
 function initializeComboboxes() {
-  for (const select of [ui.preset, ui.model, ui.compareModel, ui.correct, ui.gameModel]) {
+  for (const select of [ui.preset, ui.model, ui.compareModel, ui.correct, ui.gameModel, ui.compositionModel]) {
     const wrap = select.closest(".select-wrap");
     const label = document.querySelector(`label[for="${select.id}"]`);
     const button = document.createElement("button");
@@ -734,26 +755,178 @@ async function loadModels() {
     modelCount = models.length;
     const selectedModel = ui.model.value;
     const selectedCompareModel = ui.compareModel.value;
+    const selectedCompositionModel = ui.compositionModel.value;
     ui.model.replaceChildren(...models.map(entry => option(entry.id, entry.id)));
     ui.compareModel.replaceChildren(...models.map(entry => option(entry.id, entry.id)));
+    ui.compositionModel.replaceChildren(...models.map(entry => option(entry.id, entry.id)));
     if (!models.length) {
       ui.model.append(option("", "No models available"));
       ui.compareModel.append(option("", "No models available"));
+      ui.compositionModel.append(option("", "No models available"));
     } else {
       if (models.some(entry => entry.id === selectedModel)) ui.model.value = selectedModel;
       if (models.some(entry => entry.id === selectedCompareModel)) ui.compareModel.value = selectedCompareModel;
       else if (models.length > 1) ui.compareModel.selectedIndex = 1;
+      if (models.some(entry => entry.id === selectedCompositionModel)) ui.compositionModel.value = selectedCompositionModel;
     }
     games.setModels(models.map(entry => entry.id));
   } catch (error) {
     modelLoadError = error.message;
     ui.model.replaceChildren(option("", "Models unavailable"));
     ui.compareModel.replaceChildren(option("", "Models unavailable"));
+    ui.compositionModel.replaceChildren(option("", "Models unavailable"));
     games.setModels([]);
   }
   modelsLoaded = true;
   updateModelMessage();
+  if (isCompose()) previewComposition();
   setRunning(false);
+}
+
+function compositionTypeLabel(type) { return type === "choice" ? "Choice" : type === "score" ? "Score" : "Noul"; }
+
+function setCompositionStatus(message, error = false) {
+  ui.compositionStatus.textContent = message;
+  ui.compositionStatus.classList.toggle("error", error);
+}
+
+function compositionDraft() {
+  return {model: ui.compositionModel.value, state: ui.compositionState.value,
+    jsonState: ui.compositionJsonState.checked, steps: compositionSteps};
+}
+
+function previewComposition() {
+  try {
+    compositionRequest = buildCompositionRequest(compositionDraft());
+    ui.compositionJson.textContent = JSON.stringify(compositionRequest, null, 2);
+    ui.copyComposition.disabled = false;
+    ui.downloadComposition.disabled = false;
+    return compositionRequest;
+  } catch (error) {
+    compositionRequest = null;
+    ui.compositionJson.textContent = error.message;
+    ui.copyComposition.disabled = true;
+    ui.downloadComposition.disabled = true;
+    return null;
+  }
+}
+
+function compositionInput(step, key, value) {
+  step[key] = value;
+  previewComposition();
+}
+
+function renderComposition() {
+  ui.compositionStepCount.textContent = `${compositionSteps.length} ${compositionSteps.length === 1 ? "step" : "steps"}`;
+  ui.compositionSteps.replaceChildren();
+  compositionSteps.forEach((step, index) => {
+    const card = document.createElement("article");
+    card.className = "composition-step";
+    card.dataset.index = String(index);
+    const header = document.createElement("div");
+    header.className = "composition-step-header";
+    const number = appendText(header, "span", "composition-step-number", String(index + 1).padStart(2, "0"));
+    number.setAttribute("aria-hidden", "true");
+    const title = appendText(header, "strong", "composition-step-title", `${compositionTypeLabel(step.type)} decision`);
+    const controls = appendText(header, "div", "composition-step-controls", "");
+    for (const [action, label] of [["up", "Move up"], ["down", "Move down"], ["remove", "Remove"]]) {
+      const button = appendText(controls, "button", "step-icon-button", label);
+      button.type = "button"; button.dataset.action = action; button.title = label;
+      button.disabled = action === "up" ? index === 0 : action === "down" ? index === compositionSteps.length - 1 : compositionSteps.length === 1;
+      button.addEventListener("click", () => {
+        if (action === "remove") compositionSteps.splice(index, 1);
+        else { const target = action === "up" ? index - 1 : index + 1; [compositionSteps[index], compositionSteps[target]] = [compositionSteps[target], compositionSteps[index]]; }
+        renderComposition();
+      });
+    }
+    card.append(header);
+    const row = appendText(card, "div", "composition-step-row", "");
+    const idField = appendText(row, "div", "field", "");
+    appendText(idField, "label", "", "Step ID").htmlFor = `composition-id-${index}`;
+    const idInput = document.createElement("input"); idInput.id = `composition-id-${index}`; idInput.value = step.id; idInput.className = "composition-input"; idInput.type = "text";
+    idInput.addEventListener("input", () => compositionInput(step, "id", idInput.value)); idField.append(idInput);
+    const typeField = appendText(row, "div", "field", "");
+    appendText(typeField, "label", "", "Primitive").htmlFor = `composition-type-${index}`;
+    const typeSelect = document.createElement("select"); typeSelect.id = `composition-type-${index}`; typeSelect.className = "composition-input";
+    for (const type of ["choice", "score", "noul"]) typeSelect.append(option(type, compositionTypeLabel(type)));
+    typeSelect.value = step.type;
+    typeSelect.addEventListener("change", () => { step.type = typeSelect.value; step.criteria = step.type === "noul" ? "" : step.type === "choice" ? "support: General support\nother: Other" : "Low impact\nHigh impact"; step.advanced = false; renderComposition(); });
+    typeField.append(typeSelect);
+    const instructionField = appendText(card, "div", "field", "");
+    appendText(instructionField, "label", "", "Question").htmlFor = `composition-instruction-${index}`;
+    const instruction = document.createElement("textarea"); instruction.id = `composition-instruction-${index}`; instruction.rows = 2; instruction.value = step.instructions; instruction.className = "composition-input";
+    instruction.addEventListener("input", () => compositionInput(step, "instructions", instruction.value)); instructionField.append(instruction);
+    const criteriaField = appendText(card, "div", "field composition-criteria-field", "");
+    const criteriaLabel = appendText(criteriaField, "label", "", step.type === "choice" ? "Choices" : step.type === "score" ? "Levels" : "Criteria"); criteriaLabel.htmlFor = `composition-criteria-${index}`;
+    const advancedLabel = document.createElement("label"); advancedLabel.className = "small-check";
+    const advanced = document.createElement("input"); advanced.type = "checkbox"; advanced.checked = step.advanced;
+    const advancedText = document.createElement("span"); advancedText.textContent = "JSON criteria";
+    advancedLabel.append(advanced, advancedText);
+    advanced.addEventListener("change", () => {
+      try {
+        if (advanced.checked) {
+          const question = buildQuestion(step);
+          step.criteria = JSON.stringify(question.criteria ?? null, null, 2);
+        } else {
+          const question = buildQuestion({...step, advanced: true});
+          step.criteria = simpleCriteriaText(question);
+        }
+        step.advanced = advanced.checked;
+        renderComposition();
+      } catch (error) { advanced.checked = !advanced.checked; setCompositionStatus(error.message, true); }
+    });
+    criteriaField.append(advancedLabel);
+    const criteria = document.createElement("textarea"); criteria.id = `composition-criteria-${index}`; criteria.rows = step.type === "noul" ? 2 : 3; criteria.value = step.criteria; criteria.className = "composition-input"; criteria.disabled = step.type === "noul" && !step.advanced;
+    criteria.placeholder = step.type === "noul" ? (step.advanced ? '{"true":"…","false":"…"}' : "No criteria needed") : "";
+    criteria.addEventListener("input", () => compositionInput(step, "criteria", criteria.value)); criteriaField.append(criteria);
+    card.append(instructionField); card.append(criteriaField);
+    ui.compositionSteps.append(card);
+  });
+  previewComposition();
+  if (compositionResponse) {
+    ui.compositionResponseWrap.hidden = false;
+    ui.compositionResponse.textContent = JSON.stringify(compositionResponse, null, 2);
+  }
+}
+
+async function runCompositionWorkflow() {
+  if (compositionController) return;
+  const request = previewComposition();
+  if (!request) { setCompositionStatus(ui.compositionJson.textContent, true); return; }
+  compositionController = new AbortController();
+  ui.runComposition.disabled = true;
+  setCompositionStatus("Running workflow…");
+  try {
+    const response = await fetch("/v1/systemone", {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify(request), signal: compositionController.signal});
+    const body = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(typeof body.detail === "string" ? body.detail : `Request failed (${response.status}).`);
+    compositionResponse = body;
+    const output = Object.fromEntries(Object.entries(body.answers || {}).map(([id, answer]) => [id, {type: answer.type, prediction: hardPrediction(answer), answer}]));
+    ui.compositionJson.textContent = JSON.stringify(request, null, 2);
+    setCompositionStatus(`Workflow complete · ${Object.keys(output).length} decisions ready.`);
+    ui.compositionResponseWrap.hidden = false;
+    ui.compositionResponse.textContent = JSON.stringify({model: body.model, decisions: output, usage: body.usage}, null, 2);
+  } catch (error) { setCompositionStatus(error.name === "AbortError" ? "Stopped waiting." : error.message, error.name !== "AbortError"); }
+  finally { compositionController = null; ui.runComposition.disabled = false; }
+}
+
+function downloadText(filename, value, type = "application/json") {
+  const url = URL.createObjectURL(new Blob([value], {type})); const link = document.createElement("a"); link.href = url; link.download = filename; document.body.append(link); link.click(); link.remove(); setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+function wireComposition() {
+  ui.compositionModel.addEventListener("input", previewComposition);
+  ui.compositionState.addEventListener("input", previewComposition);
+  ui.compositionJsonState.addEventListener("change", previewComposition);
+  ui.addStep.addEventListener("click", () => { compositionSteps.push({id: `decision_${compositionSteps.length + 1}`, type: "choice", instructions: "What should happen next?", criteria: "yes: Proceed\nno: Stop", advanced: false}); renderComposition(); });
+  ui.compositionTemplate.addEventListener("click", () => { compositionSteps = defaultCompositionSteps(); ui.compositionState.value = "A customer reports a failed export and asks to speak to a person."; renderComposition(); setCompositionStatus("Escalation template loaded."); });
+  ui.runComposition.addEventListener("click", runCompositionWorkflow);
+  ui.copyComposition.addEventListener("click", async () => { if (!compositionRequest) return; await navigator.clipboard.writeText(JSON.stringify(compositionRequest, null, 2)); setCompositionStatus("Request JSON copied."); });
+  ui.copyCompositionResponse.addEventListener("click", async () => { if (!compositionResponse) return; await navigator.clipboard.writeText(JSON.stringify(compositionResponse, null, 2)); setCompositionStatus("Response JSON copied."); });
+  ui.downloadComposition.addEventListener("click", () => { if (compositionRequest) downloadText("jevembed-workflow.json", `${JSON.stringify(compositionRequest, null, 2)}\n`); });
+  ui.downloadSchema.addEventListener("click", () => downloadText("jevembed-workflow.schema.json", `${JSON.stringify(COMPOSITION_SCHEMA, null, 2)}\n`));
+  ui.compositionState.value = "A customer reports a failed export and asks to speak to a person.";
+  renderComposition();
 }
 
 ui.preset.addEventListener("change", () => { setPreset(ui.preset.value); setStatus(""); });
@@ -783,5 +956,6 @@ window.addEventListener("hashchange", () => applyRoute(true));
 initializeModules();
 setPreset("choice");
 initializeComboboxes();
+wireComposition();
 applyRoute();
 loadModels();
