@@ -183,7 +183,7 @@ Custom backends implement `encode(list[EmbeddingInput]) -> EmbeddingBatch` and c
 
 ## Models, prompts, and loading
 
-The delivered configurations are KaLM v2.5, Qwen3-Embedding 0.6B/4B/8B, multilingual E5 large instruct, and CLM v0.1-8B. Their repository IDs, dimensions, pooling, and limits are listed in the [README](../README.md#supported-model-list). Changing the model does not require rewriting business questions or criteria.
+The delivered configurations are KaLM v2.5, Qwen3-Embedding 0.6B/4B/8B, multilingual E5 large instruct, and CLM v0.1-8B. Their repository IDs, dimensions, pooling, and limits are listed in the [README](../README.md#model-list). Changing the model does not require rewriting business questions or criteria.
 
 KaLM uses repository-defined bidirectional attention and mean pooling. Qwen3-Embedding uses last-token pooling. E5 uses XLM-R and mean pooling. CLM uses Qwen3-8B last-token pooling followed by 512-dimensional state/action projections. E5 accepts 512 tokens, CLM 2048, and the remaining public configurations use a 32768-token limit. Adapter validation checks dimensions and loaded metadata.
 

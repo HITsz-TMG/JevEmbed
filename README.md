@@ -1,4 +1,4 @@
-<h1 align="center">🌖 JevEmbed：Turn Embeddings into Decisions</h1>
+<h1 align="center">🌖 JevEmbed: Turn Embeddings into Decisions</h1>
 
 ![JevEmbed pixel-art banner showing embeddings leading to Choice, Score, and Noul decisions](assets/jevembed-banner.png)
 
@@ -12,7 +12,7 @@
   <a href="docs/playground.md">
     <img alt="Interactive Playground" src="https://img.shields.io/badge/Playground-Interactive-blue">
   </a>
-  <a href="https://github.com/HITsz-TMG/JevEmbed/issues">
+  <a href="CONTRIBUTING.md">
     <img alt="Contributions welcome" src="https://img.shields.io/badge/Contributions-Welcome-blue">
   </a>
   <a href="LICENSE">
@@ -50,7 +50,11 @@ Run `python -m jevembed --playground`, then open `http://127.0.0.1:8000/playgrou
 
 ## Installation
 
-Use Python 3.10–3.12 for the tested model stack. Run these commands from the project root:
+Use Python 3.10–3.12 for the tested model stack.
+
+**Full installation**
+
+Run these commands from the project root:
 
 ```bash
 python -m venv .venv
@@ -62,7 +66,9 @@ python -m pip install -e . --no-deps
 
 `requirements.txt` includes local inference and HTTP dependencies with the constraints in `requirements-models-tested.txt`. Contributors can install `requirements-dev.txt` for testing and packaging. See [dependency compatibility](docs/compatibility.md#dependencies) for package roles and tested versions.
 
-For a minimal installation, select the required optional dependencies:
+**Optional installations**
+
+Install only the extras you need:
 
 ```bash
 python -m pip install -e .                        # Core, configuration, and explain
@@ -122,47 +128,35 @@ Use JevEmbed directly from Python:
 
 ```python
 import json
+from pathlib import Path
 from jevembed import JevEmbed, ModelConfig
 
-client = JevEmbed()
-client.register(ModelConfig.load("configs/kalm-embedding-v2.5.yaml"))
-client.register(ModelConfig.load("configs/qwen3-embedding-0.6b.yaml"))
-
-with open("examples/official_noul_escalation.json", encoding="utf-8") as handle:
-    request = json.load(handle)
-
-compiled = client.explain(request)            # No model loading
-response = client.evaluate(request)           # A plain dictionary
-result = client.evaluate_with_trace(request)  # {"response": ..., "trace": ...}
-
-request["model"] = "qwen3-embedding-0.6b"
+config = ModelConfig.load("configs/kalm-embedding-v2.5.yaml")
+client = JevEmbed(config=config)
+request = json.loads(Path("examples/official_noul_escalation.json").read_text(encoding="utf-8"))
 response = client.evaluate(request)
-
-# Python calls can omit model and use the first registered model
-response = client.system_one(state="hello", questions={
-    "greeting": {"type": "choice", "instructions": "Classify the message.",
-                 "criteria": {"greeting": "A greeting", "other": "Other content"}}
-})
-client.clear_cache()
+print(response)
 ```
 
-See the [backend contract](docs/design.md#backend-contract) for custom embedding backends and confidence estimators. For local model paths and offline loading, see [local weights and offline use](docs/runtime.md#local-weights-and-offline-use).
+See the [Python API guide](docs/python-api.md) for multiple models, direct request construction, input inspection, traces, caching, and custom backends. For local model paths and offline loading, see [local weights and offline use](docs/runtime.md#local-weights-and-offline-use).
 
-## Supported model list
+## Model list
 
-Configurations use Hugging Face repository IDs; weights download on first inference if absent from the local cache.
+Supported models are listed below. Configurations use Hugging Face repository IDs; weights download on first inference if absent from the local cache.
 
-| JevEmbed ID / configuration filename | Weight repository | Dimensions | Token limit | Pooling |
+| Weight repository | JevEmbed ID | Embedding dimensions | Max tokens | Pooling |
 | --- | --- | --- | --- | --- |
-| [`kalm-embedding-v2.5`](configs/kalm-embedding-v2.5.yaml) | [KaLM-Embedding/KaLM-embedding-multilingual-mini-instruct-v2.5](https://huggingface.co/KaLM-Embedding/KaLM-embedding-multilingual-mini-instruct-v2.5) | 896 | 32768 | Mean |
-| [`qwen3-embedding-0.6b`](configs/qwen3-embedding-0.6b.yaml) | [Qwen/Qwen3-Embedding-0.6B](https://huggingface.co/Qwen/Qwen3-Embedding-0.6B) | 1024 | 32768 | Last-token |
-| [`qwen3-embedding-4b`](configs/qwen3-embedding-4b.yaml) | [Qwen/Qwen3-Embedding-4B](https://huggingface.co/Qwen/Qwen3-Embedding-4B) | 2560 | 32768 | Last-token |
-| [`qwen3-embedding-8b`](configs/qwen3-embedding-8b.yaml) | [Qwen/Qwen3-Embedding-8B](https://huggingface.co/Qwen/Qwen3-Embedding-8B) | 4096 | 32768 | Last-token |
-| [`multilingual-e5-large-instruct`](configs/multilingual-e5-large-instruct.yaml) | [intfloat/multilingual-e5-large-instruct](https://huggingface.co/intfloat/multilingual-e5-large-instruct) | 1024 | 512 | Mean |
-| [`clm-v0.1-8b`](configs/clm-v0.1-8b.yaml) | [Contrastive-LM/CLM-v0.1-8B](https://huggingface.co/Contrastive-LM/CLM-v0.1-8B) projection heads + [Qwen/Qwen3-8B](https://huggingface.co/Qwen/Qwen3-8B) encoder | 512 | 2048 | Last-token + paired heads |
-| [`jevembed-kalm-embedding-v2.5`](configs/jevembed-kalm-embedding-v2.5.yaml) | [HIT-TMG/JevEmbed-KaLM-Embedding-V2.5](https://huggingface.co/HIT-TMG/JevEmbed-KaLM-Embedding-V2.5) | 896 | 1024 | Mean |
-| [`jevembed-qwen3-embedding-0.6b`](configs/jevembed-qwen3-embedding-0.6b.yaml) | [HIT-TMG/JevEmbed-Qwen3-Embedding-0.6B](https://huggingface.co/HIT-TMG/JevEmbed-Qwen3-Embedding-0.6B) | 1024 | 1024 | Last-token |
-| [`jevembed-qwen3-embedding-4b`](configs/jevembed-qwen3-embedding-4b.yaml) | [HIT-TMG/JevEmbed-Qwen3-Embedding-4B](https://huggingface.co/HIT-TMG/JevEmbed-Qwen3-Embedding-4B) | 2560 | 1024 | Last-token |
+| [KaLM-Embedding/KaLM-embedding-multilingual-mini-instruct-v2.5](https://huggingface.co/KaLM-Embedding/KaLM-embedding-multilingual-mini-instruct-v2.5) | `kalm-embedding-v2.5` | 896 | 32,768 | Mean |
+| [Qwen/Qwen3-Embedding-0.6B](https://huggingface.co/Qwen/Qwen3-Embedding-0.6B) | `qwen3-embedding-0.6b` | 1,024 | 32,768 | Last-token |
+| [Qwen/Qwen3-Embedding-4B](https://huggingface.co/Qwen/Qwen3-Embedding-4B) | `qwen3-embedding-4b` | 2,560 | 32,768 | Last-token |
+| [Qwen/Qwen3-Embedding-8B](https://huggingface.co/Qwen/Qwen3-Embedding-8B) | `qwen3-embedding-8b` | 4,096 | 32,768 | Last-token |
+| [intfloat/multilingual-e5-large-instruct](https://huggingface.co/intfloat/multilingual-e5-large-instruct) | `multilingual-e5-large-instruct` | 1,024 | 512 | Mean |
+| [Contrastive-LM/CLM-v0.1-8B](https://huggingface.co/Contrastive-LM/CLM-v0.1-8B) | `clm-v0.1-8b` | 512 | 2,048 | Last-token + paired heads |
+| [HIT-TMG/JevEmbed-KaLM-Embedding-V2.5](https://huggingface.co/HIT-TMG/JevEmbed-KaLM-Embedding-V2.5) | `jevembed-kalm-embedding-v2.5` | 896 | 1,024 | Mean |
+| [HIT-TMG/JevEmbed-Qwen3-Embedding-0.6B](https://huggingface.co/HIT-TMG/JevEmbed-Qwen3-Embedding-0.6B) | `jevembed-qwen3-embedding-0.6b` | 1,024 | 1,024 | Last-token |
+| [HIT-TMG/JevEmbed-Qwen3-Embedding-4B](https://huggingface.co/HIT-TMG/JevEmbed-Qwen3-Embedding-4B) | `jevembed-qwen3-embedding-4b` | 2,560 | 1,024 | Last-token |
+
+CLM-v0.1-8B uses [Qwen/Qwen3-8B](https://huggingface.co/Qwen/Qwen3-8B) as its base encoder with separate state and action projection heads.
 
 See [model configuration and loading](docs/compatibility.md#model-configuration-and-loading) for aliases, truncation, remote-code trust, and model-specific behavior.
 
@@ -188,16 +182,16 @@ JevEmbed fine-tunes Sentence Transformers encoders on Choice, Score, and Noul su
 | Setting | Value |
 | --- | --- |
 | Precision | BF16 |
-| Effective batch | **512 questions** |
-| LoRA rank | **64** |
-| LoRA alpha | **32** |
-| LoRA dropout | **0.05** |
+| Effective batch | 512 questions |
+| LoRA rank | 64 |
+| LoRA alpha | 32 |
+| LoRA dropout | 0.05 |
 | LoRA targets | `q_proj`, `k_proj`, and `v_proj` |
-| Learning rate | **2 × 10⁻⁴** |
-| Warmup | **10%** |
-| Input length | **1,024-token truncation** |
-| Choice/Score temperature | **0.1** |
-| Noul slope | **10** |
+| Learning rate | 2 × 10⁻⁴ |
+| Warmup | 10% |
+| Input length | 1,024-token truncation |
+| Choice/Score temperature | 0.1 |
+| Noul slope | 10 |
 
 Decision scaling follows the [KaLM-embedding-multilingual-mini-instruct-v2.5](configs/kalm-embedding-v2.5.yaml) and [Qwen3-Embedding-0.6B](configs/qwen3-embedding-0.6b.yaml) base configurations.
 
@@ -217,13 +211,9 @@ The [full test report](reports/JEVEMBED_DATA_TEST.md) gives Choice, Score, and N
 
 The [synthesis guide](docs/synthesis.md) explains how to use an OpenAI-compatible model to create Choice, Score, and Noul training data for a fixed question. It includes example configs, schema checks, label quotas, label checks, reference rules, and resumable generation. Review the generated samples before training.
 
-## Development
-
-See [CONTRIBUTING.md](CONTRIBUTING.md) for development, testing, and build instructions.
-
 ## JevEmbed-Data test results
 
-The six base models and three JevEmbed releases were evaluated on the same **66,482-question** [JevEmbed-Data](https://huggingface.co/datasets/HIT-TMG/JevEmbed-Data) `test` split. Runs used BF16, each model's configured prompts and scoring, and truncation at 1,024 tokens for KaLM-embedding-multilingual-mini-instruct-v2.5, Qwen3-Embedding-0.6B, Qwen3-Embedding-4B, Qwen3-Embedding-8B, and all three JevEmbed releases; 512 for multilingual-e5-large-instruct; and 2,048 for CLM-v0.1-8B. Accuracy covers **64,110 hard-labeled** questions; soft labels are excluded. The released models used the JevEmbed-Data training split; the base rows show original weights.
+The six base models and three JevEmbed releases were evaluated on the same **66,482-question** [JevEmbed-Data](https://huggingface.co/datasets/HIT-TMG/JevEmbed-Data) `test` split. Accuracy covers **64,110 hard-labeled** questions; soft labels are excluded. The released models were fine-tuned on the training split; the base rows use the original weights. Higher is better.
 
 | Model | Choice (17,487) | Score (24,260) | Noul (22,363) | Overall (64,110) |
 | --- | ---: | ---: | ---: | ---: |
@@ -234,16 +224,16 @@ The six base models and three JevEmbed releases were evaluated on the same **66,
 | [intfloat/multilingual-e5-large-instruct](https://huggingface.co/intfloat/multilingual-e5-large-instruct) | 32.07% | 24.27% | 40.54% | 32.07% |
 | [Contrastive-LM/CLM-v0.1-8B](https://huggingface.co/Contrastive-LM/CLM-v0.1-8B) | 28.59% | 25.85% | 53.74% | 36.33% |
 | [JevEmbed-KaLM-Embedding-V2.5](https://huggingface.co/HIT-TMG/JevEmbed-KaLM-Embedding-V2.5) | 71.05% | 66.17% | 90.61% | 76.03% |
-| [JevEmbed-Qwen3-Embedding-0.6B](https://huggingface.co/HIT-TMG/JevEmbed-Qwen3-Embedding-0.6B) | 84.53% | 69.55% | 94.38% | **82.30%** |
-| [JevEmbed-Qwen3-Embedding-4B](https://huggingface.co/HIT-TMG/JevEmbed-Qwen3-Embedding-4B) | 90.31% | 73.41% | 95.88% | **85.86%** |
+| [JevEmbed-Qwen3-Embedding-0.6B](https://huggingface.co/HIT-TMG/JevEmbed-Qwen3-Embedding-0.6B) | 84.53% | 69.55% | 94.38% | 82.30% |
+| [JevEmbed-Qwen3-Embedding-4B](https://huggingface.co/HIT-TMG/JevEmbed-Qwen3-Embedding-4B) | **90.31%** | **73.41%** | **95.88%** | **85.86%** |
 
 The [full test report](reports/JEVEMBED_DATA_TEST.md) gives the error metrics, denominators, and evaluation command.
 
 See the [compatibility boundaries](docs/compatibility.md) and [architecture and design](docs/design.md) for the implementation contract.
 
-## Acknowledgments
+## Development
 
-JevEmbed uses [Sentence Transformers](https://www.sbert.net/) for model loading and embedding inference. We thank its maintainers and contributors for the library and its support for the embedding community.
+See [CONTRIBUTING.md](CONTRIBUTING.md) for development, testing, and build instructions.
 
 ## Citation
 
@@ -270,7 +260,3 @@ If you find this repository useful, please consider giving it a star ⭐ and cit
       url={https://arxiv.org/abs/2501.01028},
 }
 ```
-
-## License
-
-JevEmbed is released under the [Apache License 2.0](LICENSE).

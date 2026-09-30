@@ -24,7 +24,7 @@ JevEmbed v0.1 implements Jev-shaped JSON contracts based on the [API documentati
 | Revisions | Published traces record resolved revisions when available and file hashes; unknown upstream commits remain explicitly unknown |
 | E5 | XLM-R, 1024-dimensional mean pooling; Instruct/Query queries and unprefixed documents; no remote code; 512-token limit |
 
-The supported model configurations are listed in the [README](../README.md#supported-model-list). NV-Embed-v2 is not supported.
+The supported model configurations are listed in the [README](../README.md#model-list). NV-Embed-v2 is not supported.
 
 ## Model configuration and loading
 
