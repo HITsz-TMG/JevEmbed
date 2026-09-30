@@ -1,23 +1,37 @@
-# JevEmbed
+<h1 align="center">🌖 JevEmbed：Turn Embeddings into Decisions</h1>
 
 ![JevEmbed pixel-art banner showing embeddings leading to Choice, Score, and Noul decisions](assets/jevembed-banner.png)
 
-**Meet JevEmbed — turn embeddings into decisions**
+<p align="center">
+  <a href="https://huggingface.co/collections/HIT-TMG/lychee-jevembed">
+    <img alt="JevEmbed models" src="https://img.shields.io/badge/JevEmbed_models-🤗-yellow">
+  </a>
+  <a href="https://huggingface.co/datasets/HIT-TMG/JevEmbed-Data">
+    <img alt="JevEmbed-Data" src="https://img.shields.io/badge/JevEmbed_Data-🤗-yellow">
+  </a>
+  <a href="docs/playground.md">
+    <img alt="Interactive Playground" src="https://img.shields.io/badge/Playground-Interactive-blue">
+  </a>
+  <a href="https://github.com/HITsz-TMG/JevEmbed/issues">
+    <img alt="Contributions welcome" src="https://img.shields.io/badge/Contributions-Welcome-blue">
+  </a>
+  <a href="LICENSE">
+    <img alt="MIT License" src="https://img.shields.io/badge/License-MIT-green">
+  </a>
+</p>
 
-*Choose, score, and judge with your choice of embedding model.*
-
-JevEmbed is a Python framework that turns embedding models into structured decision engines for Choice, Score, and Noul tasks. It offers a consistent Jev-style interface through a Python API, CLI, and optional HTTP server.
+**One-Stop Decision Toolkit for Embedding Models: data synthesis, fine-tuning, inference, benchmarking, and interactive exploration.**
 
 ## News
 
-- **September 29, 2026:** Added a versioned [benchmark module](docs/benchmark.md) with multi-file JSONL cases, unified Choice/Score/Noul evaluation, and structured JSON results.
-- **September 28, 2026:** Released [JevEmbed-Qwen3-Embedding-4B](https://huggingface.co/HIT-TMG/JevEmbed-Qwen3-Embedding-4B), fine-tuned on JevEmbed-Data, with merged weights and a LoRA adapter.
-- **September 27, 2026:** Added an interactive [Playground](docs/playground.md) with model comparison and Game Lab.
-- **September 26, 2026:** Added [supervised data synthesis](docs/synthesis.md) for Choice, Score, and Noul, with configurable label quotas.
-- **September 26, 2026:** JevEmbed now includes ready-to-use configurations for [JevEmbed-Qwen3-Embedding-0.6B](https://huggingface.co/HIT-TMG/JevEmbed-Qwen3-Embedding-0.6B) and [JevEmbed-KaLM-Embedding-V2.5](https://huggingface.co/HIT-TMG/JevEmbed-KaLM-Embedding-V2.5).
-- **September 25, 2026:** [JevEmbed-KaLM-Embedding-V2.5](https://huggingface.co/HIT-TMG/JevEmbed-KaLM-Embedding-V2.5) is available on Hugging Face with merged weights and a LoRA adapter.
-- **September 24, 2026:** JevEmbed now supports [CLM-v0.1-8B](https://huggingface.co/Contrastive-LM/CLM-v0.1-8B) for Choice, Score, and Noul decisions. See the [CLM-v0.1-8B setup guide](docs/clm.md).
-- **September 24, 2026:** [JevEmbed-Data](https://huggingface.co/datasets/HIT-TMG/JevEmbed-Data) is available for fine-tuning, with 1.67 million labeled Choice, Score, and Noul questions.
+- **29/9/2026:** Added a versioned [benchmark module](docs/benchmark.md) with multi-file JSONL cases, unified Choice/Score/Noul evaluation, and structured JSON results.
+- **28/9/2026:** Released [JevEmbed-Qwen3-Embedding-4B](https://huggingface.co/HIT-TMG/JevEmbed-Qwen3-Embedding-4B), fine-tuned on JevEmbed-Data, with merged weights and a LoRA adapter.
+- **27/9/2026:** Added an interactive [Playground](docs/playground.md) with model comparison and Game Lab.
+- **26/9/2026:** Added [supervised data synthesis](docs/synthesis.md) for Choice, Score, and Noul, with configurable label quotas.
+- **26/9/2026:** JevEmbed now includes ready-to-use configurations for [JevEmbed-Qwen3-Embedding-0.6B](https://huggingface.co/HIT-TMG/JevEmbed-Qwen3-Embedding-0.6B) and [JevEmbed-KaLM-Embedding-V2.5](https://huggingface.co/HIT-TMG/JevEmbed-KaLM-Embedding-V2.5).
+- **25/9/2026:** [JevEmbed-KaLM-Embedding-V2.5](https://huggingface.co/HIT-TMG/JevEmbed-KaLM-Embedding-V2.5) is available on Hugging Face with merged weights and a LoRA adapter.
+- **24/9/2026:** JevEmbed now supports [CLM-v0.1-8B](https://huggingface.co/Contrastive-LM/CLM-v0.1-8B) for Choice, Score, and Noul decisions. See the [CLM-v0.1-8B setup guide](docs/clm.md).
+- **24/9/2026:** [JevEmbed-Data](https://huggingface.co/datasets/HIT-TMG/JevEmbed-Data) is available for fine-tuning, with 1.67 million labeled Choice, Score, and Noul questions.
 
 ## Playground
 
