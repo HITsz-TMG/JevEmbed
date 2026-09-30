@@ -24,7 +24,17 @@ JevEmbed v0.1 implements Jev-shaped JSON contracts based on the [API documentati
 | Revisions | Published traces record resolved revisions when available and file hashes; unknown upstream commits remain explicitly unknown |
 | E5 | XLM-R, 1024-dimensional mean pooling; Instruct/Query queries and unprefixed documents; no remote code; 512-token limit |
 
-The supported model configurations are listed in the [README](../README.md#supported-models). NV-Embed-v2 is not supported.
+The supported model configurations are listed in the [README](../README.md#supported-model-list). NV-Embed-v2 is not supported.
+
+## Model configuration and loading
+
+Configurations are stored in `configs/<model-id>.yaml`. Repository IDs work as aliases, while responses use the canonical short ID. Unknown IDs, including `jev-latest`, are rejected.
+
+The JevEmbed releases are fine-tuned for Choice, Score, and Noul and use 1,024-token truncation.
+
+KaLM-embedding-multilingual-mini-instruct-v2.5 requires `trust_remote_code: true`. Qwen3-Embedding-0.6B, Qwen3-Embedding-4B, Qwen3-Embedding-8B, multilingual-e5-large-instruct, and CLM-v0.1-8B use `false`. Loading failures do not change trust or pooling settings. Pin revisions and dependency versions to reproduce results.
+
+CLM-v0.1-8B uses separate state/action projections and [model-specific prompts](../configs/clm-v0.1-8b.yaml), with Choice/Score temperature 0.01 and Noul slope 100. See the [CLM-v0.1-8B guide](clm.md).
 
 ## Dependencies
 

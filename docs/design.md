@@ -179,11 +179,11 @@ The Sentence Transformers backend loads repository-provided modules, preserving 
 
 The HTTP backend connects to a compatible `/v1/embeddings` endpoint with a configured model, base URL, API-key environment variable, timeout, batch size, and retry limit. The client owns template rendering. The service must reject overlong input before the deployment declares `server_enforces_length: true`; the generic adapter does not implement client-side truncation or server-owned templates. Response indices restore vector order, and missing or duplicate indices are errors. Usage belongs to each call and is never stored as shared mutable `last_usage` state.
 
-Custom Python backends can integrate other runtimes or fixed vectors for tests.
+Custom backends implement `encode(list[EmbeddingInput]) -> EmbeddingBatch` and can be injected with `JevEmbed(backend=backend, model="my-model")`. The backend renders each input and returns vectors with per-call token usage; JevEmbed retains deduplication, normalization, and scoring. Pass `confidence_estimator` to provide a custom confidence function. Custom Python backends can integrate other runtimes or fixed vectors for tests.
 
 ## Models, prompts, and loading
 
-The delivered configurations are KaLM v2.5, Qwen3-Embedding 0.6B/4B/8B, multilingual E5 large instruct, and CLM v0.1-8B. Their repository IDs, dimensions, pooling, and limits are listed in the [README](../README.md#supported-models). Changing the model does not require rewriting business questions or criteria.
+The delivered configurations are KaLM v2.5, Qwen3-Embedding 0.6B/4B/8B, multilingual E5 large instruct, and CLM v0.1-8B. Their repository IDs, dimensions, pooling, and limits are listed in the [README](../README.md#supported-model-list). Changing the model does not require rewriting business questions or criteria.
 
 KaLM uses repository-defined bidirectional attention and mean pooling. Qwen3-Embedding uses last-token pooling. E5 uses XLM-R and mean pooling. CLM uses Qwen3-8B last-token pooling followed by 512-dimensional state/action projections. E5 accepts 512 tokens, CLM 2048, and the remaining public configurations use a 32768-token limit. Adapter validation checks dimensions and loaded metadata.
 

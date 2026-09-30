@@ -18,6 +18,24 @@ The in-memory LRU cache defaults to 4096 entries. Cache identity includes the mo
 
 Usage counts only inputs actually encoded after deduplication; cache hits add no tokens and `output_tokens=0`. Missing exact counts cause an error by default. Optional `usage_mode: estimate` uses `ceil(UTF-8 bytes / 4)` per text and marks estimates in logs and traces.
 
+## Local weights and offline use
+
+Copy a public configuration into the ignored `configs/local/` directory:
+
+```bash
+mkdir -p configs/local
+cp configs/kalm-embedding-v2.5.yaml configs/local/kalm.yaml
+```
+
+Set the model directory and offline loading policy in the copied configuration:
+
+```yaml
+model_name_or_path: ./models/KaLM-embedding-multilingual-mini-instruct-v2.5
+local_files_only: true
+```
+
+Relative paths resolve from the command's working directory. Run with `--config configs/local/kalm.yaml`. You can also set `HF_HUB_OFFLINE=1` for offline operation. `models/`, `configs/local/`, `*.local.yaml`, `.env`, and `artifacts/` are ignored by Git for local weights, configuration, and outputs.
+
 ## HTTP serving limits
 
 The optional HTTP server applies these limits per process to both `/v1/systemone` and, when enabled, `/debug/explain`:

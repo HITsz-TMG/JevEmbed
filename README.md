@@ -16,7 +16,7 @@
     <img alt="Contributions welcome" src="https://img.shields.io/badge/Contributions-Welcome-blue">
   </a>
   <a href="LICENSE">
-    <img alt="MIT License" src="https://img.shields.io/badge/License-MIT-green">
+    <img alt="Apache 2.0 License" src="https://img.shields.io/badge/License-Apache_2.0-green">
   </a>
 </p>
 
@@ -24,14 +24,21 @@
 
 ## News
 
-- **29/9/2026:** Added a versioned [benchmark module](docs/benchmark.md) with multi-file JSONL cases, unified Choice/Score/Noul evaluation, and structured JSON results.
-- **28/9/2026:** Released [JevEmbed-Qwen3-Embedding-4B](https://huggingface.co/HIT-TMG/JevEmbed-Qwen3-Embedding-4B), fine-tuned on JevEmbed-Data, with merged weights and a LoRA adapter.
-- **27/9/2026:** Added an interactive [Playground](docs/playground.md) with model comparison and Game Lab.
-- **26/9/2026:** Added [supervised data synthesis](docs/synthesis.md) for Choice, Score, and Noul, with configurable label quotas.
-- **26/9/2026:** JevEmbed now includes ready-to-use configurations for [JevEmbed-Qwen3-Embedding-0.6B](https://huggingface.co/HIT-TMG/JevEmbed-Qwen3-Embedding-0.6B) and [JevEmbed-KaLM-Embedding-V2.5](https://huggingface.co/HIT-TMG/JevEmbed-KaLM-Embedding-V2.5).
-- **25/9/2026:** [JevEmbed-KaLM-Embedding-V2.5](https://huggingface.co/HIT-TMG/JevEmbed-KaLM-Embedding-V2.5) is available on Hugging Face with merged weights and a LoRA adapter.
-- **24/9/2026:** JevEmbed now supports [CLM-v0.1-8B](https://huggingface.co/Contrastive-LM/CLM-v0.1-8B) for Choice, Score, and Noul decisions. See the [CLM-v0.1-8B setup guide](docs/clm.md).
-- **24/9/2026:** [JevEmbed-Data](https://huggingface.co/datasets/HIT-TMG/JevEmbed-Data) is available for fine-tuning, with 1.67 million labeled Choice, Score, and Noul questions.
+- 29/9/2026: 📏 Added a versioned [benchmark module](docs/benchmark.md) with multi-file JSONL cases, unified Choice/Score/Noul evaluation, and structured JSON results.
+- 28/9/2026: ✨ Released [JevEmbed-Qwen3-Embedding-4B](https://huggingface.co/HIT-TMG/JevEmbed-Qwen3-Embedding-4B), fine-tuned on JevEmbed-Data, with merged weights and a LoRA adapter.
+- 27/9/2026: 🕹️ Added an interactive [Playground](docs/playground.md) with model comparison and Game Lab.
+- 26/9/2026: 🪄 Added [supervised data synthesis](docs/synthesis.md) for Choice, Score, and Noul, with configurable label quotas.
+- 26/9/2026: ⚙️ JevEmbed now includes ready-to-use configurations for [JevEmbed-Qwen3-Embedding-0.6B](https://huggingface.co/HIT-TMG/JevEmbed-Qwen3-Embedding-0.6B) and [JevEmbed-KaLM-Embedding-V2.5](https://huggingface.co/HIT-TMG/JevEmbed-KaLM-Embedding-V2.5).
+
+<details>
+  <summary>More</summary>
+<!-- ### More -->
+
+- 25/9/2026: ✨ [JevEmbed-KaLM-Embedding-V2.5](https://huggingface.co/HIT-TMG/JevEmbed-KaLM-Embedding-V2.5) is available on Hugging Face with merged weights and a LoRA adapter.
+- 24/9/2026: 🔌 JevEmbed now supports [CLM-v0.1-8B](https://huggingface.co/Contrastive-LM/CLM-v0.1-8B) for Choice, Score, and Noul decisions. See the [CLM-v0.1-8B setup guide](docs/clm.md).
+- 24/9/2026: 🗃️ [JevEmbed-Data](https://huggingface.co/datasets/HIT-TMG/JevEmbed-Data) is available for fine-tuning, with 1.67 million labeled Choice, Score, and Noul questions.
+
+</details>
 
 ## Playground
 
@@ -66,68 +73,52 @@ python -m pip install -r requirements-dev.txt     # Tests and builds, without mo
 
 Core imports and `--explain` require no model weights or service.
 
-## Supported models
-
-Configurations use Hugging Face repository IDs; weights download on first inference if absent from the local cache.
-
-| JevEmbed ID / configuration filename | Weight repository | Dimensions | Token limit | Pooling |
-| --- | --- | --- | --- | --- |
-| `kalm-embedding-v2.5` | `KaLM-Embedding/KaLM-embedding-multilingual-mini-instruct-v2.5` | 896 | 32768 | Mean |
-| `qwen3-embedding-0.6b` | `Qwen/Qwen3-Embedding-0.6B` | 1024 | 32768 | Last-token |
-| `qwen3-embedding-4b` | `Qwen/Qwen3-Embedding-4B` | 2560 | 32768 | Last-token |
-| `qwen3-embedding-8b` | `Qwen/Qwen3-Embedding-8B` | 4096 | 32768 | Last-token |
-| `multilingual-e5-large-instruct` | `intfloat/multilingual-e5-large-instruct` | 1024 | 512 | Mean |
-| `clm-v0.1-8b` | `Contrastive-LM/CLM-v0.1-8B` projection heads + `Qwen/Qwen3-8B` encoder | 512 | 2048 | Last-token + paired heads |
-| [`jevembed-kalm-embedding-v2.5`](configs/jevembed-kalm-embedding-v2.5.yaml) | [HIT-TMG/JevEmbed-KaLM-Embedding-V2.5](https://huggingface.co/HIT-TMG/JevEmbed-KaLM-Embedding-V2.5) | 896 | 1024 | Mean |
-| [`jevembed-qwen3-embedding-0.6b`](configs/jevembed-qwen3-embedding-0.6b.yaml) | [HIT-TMG/JevEmbed-Qwen3-Embedding-0.6B](https://huggingface.co/HIT-TMG/JevEmbed-Qwen3-Embedding-0.6B) | 1024 | 1024 | Last-token |
-| [`jevembed-qwen3-embedding-4b`](configs/jevembed-qwen3-embedding-4b.yaml) | [HIT-TMG/JevEmbed-Qwen3-Embedding-4B](https://huggingface.co/HIT-TMG/JevEmbed-Qwen3-Embedding-4B) | 2560 | 1024 | Last-token |
-
-Configurations are in `configs/<model-id>.yaml`. Repository IDs work as aliases; responses use the short ID. Unknown IDs, including `jev-latest`, are rejected.
-
-The JevEmbed releases are fine-tuned for Choice, Score, and Noul and use 1,024-token truncation.
-
-KaLM-embedding-multilingual-mini-instruct-v2.5 requires `trust_remote_code: true`. Qwen3-Embedding-0.6B, Qwen3-Embedding-4B, Qwen3-Embedding-8B, multilingual-e5-large-instruct, and CLM-v0.1-8B use `false`. Loading failures do not change trust or pooling settings. Pin revisions and dependency versions to reproduce results.
-
-CLM-v0.1-8B uses separate state/action projections and [model-specific prompts](configs/clm-v0.1-8b.yaml), with Choice/Score temperature 0.01 and Noul slope 100. See the [CLM-v0.1-8B guide](docs/clm.md).
-
 ## Quick start
+
+Run a single request from the command line:
 
 ```bash
 python -m jevembed --config configs/kalm-embedding-v2.5.yaml \
   --input examples/official_choice_exchange.json
 ```
 
-Repeat `--config` for multiple models and set the request's `model` field to the selected ID. `--input -` reads standard input.
-
-For JevEmbed-Qwen3-Embedding-0.6B, use `--config configs/jevembed-qwen3-embedding-0.6b.yaml` with `"model": "jevembed-qwen3-embedding-0.6b"`. JevEmbed-KaLM-Embedding-V2.5 uses its [configuration](configs/jevembed-kalm-embedding-v2.5.yaml) and `jevembed-kalm-embedding-v2.5` ID.
-
-For JevEmbed-Qwen3-Embedding-4B, use `--config configs/jevembed-qwen3-embedding-4b.yaml` with `"model": "jevembed-qwen3-embedding-4b"`; `HIT-TMG/JevEmbed-Qwen3-Embedding-4B` and `JevEmbed-Qwen3-Embedding-4B` are aliases.
-
-The shared [examples](examples/README.md) cover all three tasks. To try another model, replace `"model": "kalm-embedding-v2.5"` in the request and select the matching configuration. The [local runner](scripts/run_local.sh) is available for source checkouts.
-
-## Official Jev examples
-
-The official Choice, Score, and Noul requests, saved Jev reference outputs, and KaLM-embedding-multilingual-mini-instruct-v2.5 predictions are documented in [official examples and scoring](docs/examples-and-scoring.md).
-
-## Local weights and offline use
-
-Copy a public configuration into the ignored `configs/local/` directory:
+To keep a model loaded and serve decisions over HTTP, start the server from the project root:
 
 ```bash
-mkdir -p configs/local
-cp configs/kalm-embedding-v2.5.yaml configs/local/kalm.yaml
+python -m jevembed \
+  --config configs/jevembed-qwen3-embedding-0.6b.yaml \
+  --serve
 ```
 
-Set the model directory and offline loading policy in the copied configuration:
+Send a Choice request from another terminal:
 
-```yaml
-model_name_or_path: ./models/KaLM-embedding-multilingual-mini-instruct-v2.5
-local_files_only: true
+```bash
+curl -sS http://127.0.0.1:8000/v1/systemone \
+  -H 'Content-Type: application/json' \
+  --data-binary @- <<'JSON'
+{
+  "model": "jevembed-qwen3-embedding-0.6b",
+  "state": "My running shoes arrived in the wrong size. Can I swap them for a size 10?",
+  "questions": {
+    "department": {
+      "type": "choice",
+      "instructions": "Which team should handle this?",
+      "criteria": {
+        "returns": "Exchanges, wrong or damaged items",
+        "shipping": "Delivery status, delays, lost packages",
+        "billing": "Charges, invoices, payment problems"
+      }
+    }
+  }
+}
+JSON
 ```
 
-Relative paths resolve from the command's working directory. Run with `--config configs/local/kalm.yaml`. You can also set `HF_HUB_OFFLINE=1` for offline operation. `models/`, `configs/local/`, `*.local.yaml`, `.env`, and `artifacts/` are ignored by Git for local weights, configuration, and outputs.
+See the [HTTP guide](docs/http.md) for Python requests, multiple models, Score and Noul examples, serving options, limits, and error responses.
 
-## Python API
+To use an external `/v1/embeddings` service as the backend, start with [http-example.yaml](configs/http-example.yaml) and follow the [external service guide](docs/http.md#call-an-external-embeddings-service).
+
+Use JevEmbed directly from Python:
 
 ```python
 import json
@@ -155,21 +146,29 @@ response = client.system_one(state="hello", questions={
 client.clear_cache()
 ```
 
-Custom backends implement `encode(list[EmbeddingInput]) -> EmbeddingBatch` and can be injected with `JevEmbed(backend=backend, model="my-model")`. Each input carries a role, instruction, and text. The backend renders its template and returns vectors and per-call token usage. The core handles deduplication, normalization, and scoring. Use `confidence_estimator` to supply a custom confidence function.
+See the [backend contract](docs/design.md#backend-contract) for custom embedding backends and confidence estimators. For local model paths and offline loading, see [local weights and offline use](docs/runtime.md#local-weights-and-offline-use).
 
-## Input mapping and scoring
+## Supported model list
 
-JevEmbed compiles each primitive into embedding inputs, cosine similarities, and a task-specific scoring rule. See [official examples and scoring](docs/examples-and-scoring.md#input-mapping-and-scoring) for rendered inputs, formulas, and worked cases.
+Configurations use Hugging Face repository IDs; weights download on first inference if absent from the local cache.
 
-## HTTP interfaces
+| JevEmbed ID / configuration filename | Weight repository | Dimensions | Token limit | Pooling |
+| --- | --- | --- | --- | --- |
+| [`kalm-embedding-v2.5`](configs/kalm-embedding-v2.5.yaml) | [KaLM-Embedding/KaLM-embedding-multilingual-mini-instruct-v2.5](https://huggingface.co/KaLM-Embedding/KaLM-embedding-multilingual-mini-instruct-v2.5) | 896 | 32768 | Mean |
+| [`qwen3-embedding-0.6b`](configs/qwen3-embedding-0.6b.yaml) | [Qwen/Qwen3-Embedding-0.6B](https://huggingface.co/Qwen/Qwen3-Embedding-0.6B) | 1024 | 32768 | Last-token |
+| [`qwen3-embedding-4b`](configs/qwen3-embedding-4b.yaml) | [Qwen/Qwen3-Embedding-4B](https://huggingface.co/Qwen/Qwen3-Embedding-4B) | 2560 | 32768 | Last-token |
+| [`qwen3-embedding-8b`](configs/qwen3-embedding-8b.yaml) | [Qwen/Qwen3-Embedding-8B](https://huggingface.co/Qwen/Qwen3-Embedding-8B) | 4096 | 32768 | Last-token |
+| [`multilingual-e5-large-instruct`](configs/multilingual-e5-large-instruct.yaml) | [intfloat/multilingual-e5-large-instruct](https://huggingface.co/intfloat/multilingual-e5-large-instruct) | 1024 | 512 | Mean |
+| [`clm-v0.1-8b`](configs/clm-v0.1-8b.yaml) | [Contrastive-LM/CLM-v0.1-8B](https://huggingface.co/Contrastive-LM/CLM-v0.1-8B) projection heads + [Qwen/Qwen3-8B](https://huggingface.co/Qwen/Qwen3-8B) encoder | 512 | 2048 | Last-token + paired heads |
+| [`jevembed-kalm-embedding-v2.5`](configs/jevembed-kalm-embedding-v2.5.yaml) | [HIT-TMG/JevEmbed-KaLM-Embedding-V2.5](https://huggingface.co/HIT-TMG/JevEmbed-KaLM-Embedding-V2.5) | 896 | 1024 | Mean |
+| [`jevembed-qwen3-embedding-0.6b`](configs/jevembed-qwen3-embedding-0.6b.yaml) | [HIT-TMG/JevEmbed-Qwen3-Embedding-0.6B](https://huggingface.co/HIT-TMG/JevEmbed-Qwen3-Embedding-0.6B) | 1024 | 1024 | Last-token |
+| [`jevembed-qwen3-embedding-4b`](configs/jevembed-qwen3-embedding-4b.yaml) | [HIT-TMG/JevEmbed-Qwen3-Embedding-4B](https://huggingface.co/HIT-TMG/JevEmbed-Qwen3-Embedding-4B) | 2560 | 1024 | Last-token |
 
-```bash
-python -m jevembed --config configs/kalm-embedding-v2.5.yaml --serve
-```
+See [model configuration and loading](docs/compatibility.md#model-configuration-and-loading) for aliases, truncation, remote-code trust, and model-specific behavior.
 
-The server binds to `127.0.0.1:8000` and provides `POST /v1/systemone` and `GET /v1/models`. HTTP requests require `model`; validation errors return 422 and backend failures 502. Per process, the defaults are 2 MiB, 64 questions, 4096 embedding inputs, four active requests, and a 30-second body read timeout. Size or work violations return 413, excess concurrency 429, and slow uploads 408. The [HTTP guide](docs/http.md) has `curl` and Python examples; [serving limits](docs/runtime.md#http-serving-limits) covers options and concurrency.
+## Official Jev examples, input mapping, and scoring
 
-Use [http-example.yaml](configs/http-example.yaml) to connect to an embeddings service. Templates are rendered by the client; the service must enforce input length before `server_enforces_length: true` is set. The [HTTP guide](docs/http.md#call-an-external-embeddings-service) explains this separate backend.
+See [official examples and scoring](docs/examples-and-scoring.md) for Choice, Score, and Noul requests, saved Jev reference outputs, KaLM-embedding-multilingual-mini-instruct-v2.5 predictions, rendered embedding inputs, scoring rules, and worked cases.
 
 ## Benchmarking
 
@@ -186,10 +185,21 @@ The [benchmark guide](docs/benchmark.md) defines the input format, targets, metr
 
 JevEmbed fine-tunes Sentence Transformers encoders on Choice, Score, and Noul supervision, including soft targets. The released [JevEmbed-KaLM-Embedding-V2.5](https://huggingface.co/HIT-TMG/JevEmbed-KaLM-Embedding-V2.5), [JevEmbed-Qwen3-Embedding-0.6B](https://huggingface.co/HIT-TMG/JevEmbed-Qwen3-Embedding-0.6B), and [JevEmbed-Qwen3-Embedding-4B](https://huggingface.co/HIT-TMG/JevEmbed-Qwen3-Embedding-4B) models each trained for **one epoch on all 1,601,157 JevEmbed-Data training questions**, then had their LoRA weights merged into standalone models. All three used:
 
-- BF16 and an effective batch of **512 questions**;
-- LoRA rank **64**, alpha **32**, dropout **0.05**, and `q_proj`/`k_proj`/`v_proj` targets;
-- learning rate **2 × 10⁻⁴** with **10% warmup** and **1,024-token truncation**;
-- Choice/Score temperature **0.1** and Noul slope **10** in the [KaLM-embedding-multilingual-mini-instruct-v2.5](configs/kalm-embedding-v2.5.yaml) and [Qwen3-Embedding-0.6B](configs/qwen3-embedding-0.6b.yaml) base configurations.
+| Setting | Value |
+| --- | --- |
+| Precision | BF16 |
+| Effective batch | **512 questions** |
+| LoRA rank | **64** |
+| LoRA alpha | **32** |
+| LoRA dropout | **0.05** |
+| LoRA targets | `q_proj`, `k_proj`, and `v_proj` |
+| Learning rate | **2 × 10⁻⁴** |
+| Warmup | **10%** |
+| Input length | **1,024-token truncation** |
+| Choice/Score temperature | **0.1** |
+| Noul slope | **10** |
+
+Decision scaling follows the [KaLM-embedding-multilingual-mini-instruct-v2.5](configs/kalm-embedding-v2.5.yaml) and [Qwen3-Embedding-0.6B](configs/qwen3-embedding-0.6b.yaml) base configurations.
 
 Install the training extra with `python -m pip install -e '.[train]' -c requirements-models-tested.txt`. The trainer reads supervised JSONL, so convert the dataset's `train` Parquet rows to the [documented JSONL schema](docs/training.md#supervision-format-and-objectives) and reserve `test` for final evaluation. The [training guide](docs/training.md) covers commands, validation, and adapter inference; the model cards give each release's exact settings.
 
@@ -203,21 +213,13 @@ On the held-out JevEmbed-Data `test` split, overall hard-label accuracy covers *
 
 The [full test report](reports/JEVEMBED_DATA_TEST.md) gives Choice, Score, and Noul accuracy and error metrics.
 
-## Synthetic training data
+## Data synthesis
 
-The [synthesis guide](docs/synthesis.md) shows how to generate hard-labeled Choice, Score, or Noul JSONL for a fixed question using an OpenAI-compatible teacher. It includes four example configs, schema checks, configurable label quotas, a separate teacher label check, optional trusted reference rules, and resumable output. Review the generated data before using it with the trainer.
+The [synthesis guide](docs/synthesis.md) explains how to use an OpenAI-compatible model to create Choice, Score, and Noul training data for a fixed question. It includes example configs, schema checks, label quotas, label checks, reference rules, and resumable generation. Review the generated samples before training.
 
-## Development and validation
+## Development
 
-```bash
-python -m pip install -r requirements-dev.txt
-python -m pytest -q
-
-# Build a wheel and source distribution
-python -m build
-```
-
-Tests use fixtures and mock models without downloading weights. Save generated traces under the ignored `artifacts/` directory.
+See [CONTRIBUTING.md](CONTRIBUTING.md) for development, testing, and build instructions.
 
 ## JevEmbed-Data test results
 
@@ -225,12 +227,12 @@ The six base models and three JevEmbed releases were evaluated on the same **66,
 
 | Model | Choice (17,487) | Score (24,260) | Noul (22,363) | Overall (64,110) |
 | --- | ---: | ---: | ---: | ---: |
-| `KaLM-Embedding/KaLM-embedding-multilingual-mini-instruct-v2.5` | 28.61% | 27.45% | 40.52% | 32.33% |
-| `Qwen/Qwen3-Embedding-0.6B` | 33.02% | 28.56% | 40.05% | 33.79% |
-| `Qwen/Qwen3-Embedding-4B` | 38.11% | 30.55% | 41.09% | 36.29% |
-| `Qwen/Qwen3-Embedding-8B` | 43.20% | 33.49% | 42.57% | 39.30% |
-| `intfloat/multilingual-e5-large-instruct` | 32.07% | 24.27% | 40.54% | 32.07% |
-| `Contrastive-LM/CLM-v0.1-8B` | 28.59% | 25.85% | 53.74% | 36.33% |
+| [KaLM-Embedding/KaLM-embedding-multilingual-mini-instruct-v2.5](https://huggingface.co/KaLM-Embedding/KaLM-embedding-multilingual-mini-instruct-v2.5) | 28.61% | 27.45% | 40.52% | 32.33% |
+| [Qwen/Qwen3-Embedding-0.6B](https://huggingface.co/Qwen/Qwen3-Embedding-0.6B) | 33.02% | 28.56% | 40.05% | 33.79% |
+| [Qwen/Qwen3-Embedding-4B](https://huggingface.co/Qwen/Qwen3-Embedding-4B) | 38.11% | 30.55% | 41.09% | 36.29% |
+| [Qwen/Qwen3-Embedding-8B](https://huggingface.co/Qwen/Qwen3-Embedding-8B) | 43.20% | 33.49% | 42.57% | 39.30% |
+| [intfloat/multilingual-e5-large-instruct](https://huggingface.co/intfloat/multilingual-e5-large-instruct) | 32.07% | 24.27% | 40.54% | 32.07% |
+| [Contrastive-LM/CLM-v0.1-8B](https://huggingface.co/Contrastive-LM/CLM-v0.1-8B) | 28.59% | 25.85% | 53.74% | 36.33% |
 | [JevEmbed-KaLM-Embedding-V2.5](https://huggingface.co/HIT-TMG/JevEmbed-KaLM-Embedding-V2.5) | 71.05% | 66.17% | 90.61% | 76.03% |
 | [JevEmbed-Qwen3-Embedding-0.6B](https://huggingface.co/HIT-TMG/JevEmbed-Qwen3-Embedding-0.6B) | 84.53% | 69.55% | 94.38% | **82.30%** |
 | [JevEmbed-Qwen3-Embedding-4B](https://huggingface.co/HIT-TMG/JevEmbed-Qwen3-Embedding-4B) | 90.31% | 73.41% | 95.88% | **85.86%** |
@@ -245,7 +247,7 @@ JevEmbed uses [Sentence Transformers](https://www.sbert.net/) for model loading 
 
 ## Citation
 
-If you find JevEmbed useful, please consider citing the following papers:
+If you find this repository useful, please consider giving it a star ⭐ and citing the following papers:
 
 ```bibtex
 @misc{zhao2025kalmembeddingv2,
@@ -268,3 +270,7 @@ If you find JevEmbed useful, please consider citing the following papers:
       url={https://arxiv.org/abs/2501.01028},
 }
 ```
+
+## License
+
+JevEmbed is released under the [Apache License 2.0](LICENSE).
