@@ -7,7 +7,7 @@
   <title>Playground · JevEmbed</title>
   <link rel="stylesheet" href="./style.css">
   <link rel="stylesheet" href="./games.css">
-  <script type="module" src="./app.js"></script>
+  <script type="module" src="./app.js?v=20261001"></script>
 </head>
 <body>
   <div id="app-shell" class="app-shell">
@@ -60,6 +60,13 @@
           </div>
         </section>
       </div>
+      <section id="composition-workspace" class="composition-workspace" hidden aria-labelledby="composition-title">
+        <div class="composition-header"><div><span class="panel-eyebrow">COMPOSE / MULTI-DECISION</span><h2 id="composition-title">Build a decision workflow</h2><p>Run Choice, Score, and Noul questions together against one state.</p></div><button id="composition-template" class="quiet-button" type="button">Load escalation template</button></div>
+        <div class="composition-grid">
+          <section class="composition-editor" aria-label="Workflow editor"><div class="composition-shared field"><div class="form-row"><div class="field"><label for="composition-model">Model</label><div class="select-wrap"><select id="composition-model"><option value="">Loading models…</option></select></div></div><label class="small-check composition-json-state"><input id="composition-json-state" type="checkbox"><span>JSON state</span></label></div><label for="composition-state">Shared state</label><textarea id="composition-state" rows="3"></textarea><p class="helper">Every decision reads this same state object.</p></div><div class="composition-toolbar"><div><strong id="composition-step-count">1 step</strong><span>· shared state</span></div><button id="add-step" class="secondary-button" type="button">+ Add decision</button></div><div id="composition-map" class="composition-map" aria-label="Decision workflow map"><svg id="composition-links" class="composition-links" aria-hidden="true" focusable="false"></svg><div id="composition-root" class="composition-map-root"></div><div id="composition-steps" class="composition-steps" role="list"></div></div><div class="composition-actions"><button id="run-composition" class="primary-button" type="button"><span class="run-icon" aria-hidden="true"><svg viewBox="0 0 16 16" fill="currentColor"><path d="M4.25 2.5a.75.75 0 0 1 1.13-.65l8 5.5a.8.8 0 0 1 0 1.3l-8 5.5a.75.75 0 0 1-1.13-.65z"/></svg></span><span>Run workflow</span></button><span id="composition-status" class="run-status" role="status" aria-live="polite"></span></div></section>
+          <section class="composition-preview" aria-label="Workflow JSON"><div class="composition-preview-heading"><div><span class="panel-eyebrow">EXPORT / CONFIG</span><h3>Request JSON</h3></div><div class="composition-export-actions"><button id="copy-composition" class="quiet-button" type="button" disabled>Copy</button><button id="download-composition" class="quiet-button" type="button" disabled>Download</button></div></div><pre id="composition-json" class="composition-json" tabindex="0">Add a decision to preview the request.</pre><div class="schema-row"><span>Schema-ready config for your code</span><button id="download-schema" class="quiet-button" type="button">Download JSON Schema</button></div><div id="composition-response-wrap" class="composition-response-wrap" hidden><div class="composition-response-heading"><span>Last response</span><button id="copy-composition-response" class="quiet-button" type="button">Copy response</button></div><pre id="composition-response" class="composition-json composition-response" tabindex="0"></pre></div></section>
+        </div>
+      </section>
       <section id="game-lab" class="game-lab" aria-label="Game Lab" hidden>
         <div class="game-lab-heading"><div><h2>Every move is a model decision.</h2><p>Pick a game and an embedding model.</p></div></div>
         <div class="game-picker" role="group" aria-label="Choose a game">

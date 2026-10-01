@@ -98,6 +98,61 @@ export function buildRequest({model, state, jsonState, type, instructions, crite
   return {model, state: content, questions: {decision: buildQuestion({type, instructions, criteria, advanced})}};
 }
 
+export function buildCompositionRequest({model, state, jsonState, steps}) {
+  if (!model) throw new Error("Choose a model.");
+  let content = state;
+  if (jsonState) {
+    try { content = JSON.parse(state); }
+    catch { throw new Error("State must be valid JSON."); }
+    requireFiniteNumbers(content, "State");
+    if (!isContent(content)) throw new Error("JSON state must be text, an object, or an array.");
+  }
+  if (typeof content === "string" && !content.trim()) throw new Error("Add a state to evaluate.");
+  if (!Array.isArray(steps) || !steps.length) throw new Error("Add at least one decision step.");
+  const questions = {};
+  steps.forEach((step, index) => {
+    const id = String(step.id || `decision_${index + 1}`).trim();
+    if (!/^[A-Za-z][A-Za-z0-9_-]*$/.test(id)) throw new Error("Step IDs must start with a letter and use letters, numbers, _ or -.");
+    if (questions[id]) throw new Error(`Step ID \"${id}\" must be unique.`);
+    questions[id] = buildQuestion(step);
+  });
+  return {model, state: content, questions};
+}
+
+export const COMPOSITION_SCHEMA = {
+  $schema: "https://json-schema.org/draft/2020-12/schema",
+  title: "JevEmbed decision composition",
+  type: "object",
+  additionalProperties: false,
+  required: ["model", "state", "questions"],
+  properties: {
+    model: {type: "string", minLength: 1},
+    state: {oneOf: [{type: "string"}, {type: "object"}, {type: "array"}]},
+    questions: {
+      type: "object", minProperties: 1,
+      additionalProperties: {oneOf: [
+        {type: "object", additionalProperties: false, required: ["type", "instructions", "criteria"], properties: {
+          type: {const: "choice"}, instructions: {type: "string", minLength: 1},
+          criteria: {type: "object", minProperties: 1, additionalProperties: {oneOf: [{type: "string"}, {type: "object"}, {type: "array"}, {type: "null"}]}}
+        }},
+        {type: "object", additionalProperties: false, required: ["type", "instructions", "criteria"], properties: {
+          type: {const: "score"}, instructions: {type: "string", minLength: 1},
+          criteria: {type: "array", minItems: 2, maxItems: 10, items: {oneOf: [{type: "string"}, {type: "object"}, {type: "array"}, {type: "null"}]}}
+        }},
+        {type: "object", additionalProperties: false, required: ["type", "instructions"], properties: {
+          type: {const: "noul"}, instructions: {type: "string", minLength: 1},
+          criteria: {type: "object", required: ["true", "false"], additionalProperties: false}
+        }}
+      ]}
+    }
+  }
+};
+
+export function preferredModelId(models) {
+  const entries = Array.isArray(models) ? models.filter(entry => entry && typeof entry.id === "string" && entry.id) : [];
+  return entries.find(entry => /jevembed/i.test(entry.id))?.id || entries[0]?.id || "";
+}
+
 export function labelsForQuestion(question) {
   if (question.type === "choice") return Object.keys(question.criteria);
   if (question.type === "score") return question.criteria.map((_, index) => String(index));
