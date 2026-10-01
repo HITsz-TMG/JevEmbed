@@ -148,6 +148,11 @@ export const COMPOSITION_SCHEMA = {
   }
 };
 
+export function preferredModelId(models) {
+  const entries = Array.isArray(models) ? models.filter(entry => entry && typeof entry.id === "string" && entry.id) : [];
+  return entries.find(entry => /jevembed/i.test(entry.id))?.id || entries[0]?.id || "";
+}
+
 export function labelsForQuestion(question) {
   if (question.type === "choice") return Object.keys(question.criteria);
   if (question.type === "score") return question.criteria.map((_, index) => String(index));

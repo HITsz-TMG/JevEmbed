@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import {buildQuestion, buildCompositionRequest, buildRequest, comparison, hardPrediction, scoreSummary, simpleCriteriaText, trainingRecord} from "../../src/jevembed/playground/logic.mjs";
+import {buildQuestion, buildCompositionRequest, buildRequest, comparison, hardPrediction, preferredModelId, scoreSummary, simpleCriteriaText, trainingRecord} from "../../src/jevembed/playground/logic.mjs";
 
 const draft = {model: "base", state: "A customer asks for a person", jsonState: false,
   type: "choice", instructions: "Route this", criteria: "human: Needs an agent\nbot: Can self-serve", advanced: false};
@@ -119,4 +119,10 @@ test("composition validates unique step IDs and JSON shared state", () => {
     {id: "triage", type: "noul", instructions: "Escalate?", criteria: "", advanced: false},
   ]});
   assert.deepEqual(request.state, {ticket: 7});
+});
+
+test("prefers the JevEmbed checkpoint when the playground has multiple models", () => {
+  assert.equal(preferredModelId([{id: "qwen3-embedding-0.6b"}, {id: "jevembed-qwen3-embedding-0.6b"}]), "jevembed-qwen3-embedding-0.6b");
+  assert.equal(preferredModelId([{id: "base"}]), "base");
+  assert.equal(preferredModelId([]), "");
 });

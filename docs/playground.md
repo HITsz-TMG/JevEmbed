@@ -20,6 +20,16 @@ python -m jevembed \
   --playground
 ```
 
+For a CPU smoke test, register the JevEmbed checkpoint explicitly so the first request does not load the separate base Qwen checkpoint:
+
+```bash
+python -m jevembed \
+  --config configs/jevembed-qwen3-embedding-0.6b.yaml \
+  --host 127.0.0.1 --port 8000 --playground
+```
+
+If the base model reports `Unrecognized model ... missing a model_type key`, inspect the cached `config.json` before changing application code. Transformers 4.51.0 recognizes `qwen3`; this message means the downloaded config is incomplete or the process is using an old cache. Move only the affected `models--Qwen--Qwen3-Embedding-0.6B` cache directory aside, then retry the explicit JevEmbed configuration. Keep `transformers==4.51.0` and `sentence-transformers==5.3.0` from `requirements-models-tested.txt`.
+
 Open <http://127.0.0.1:8000/playground/>. `--playground` starts the HTTP server; no JavaScript build is needed. The server binds to `127.0.0.1` by default. Use `--host` and `--port` if needed. Model weights load on the first run for each model and stay resident, so loading both models needs enough memory for both. A first run may also download weights that are not cached locally.
 
 Use **Playground** for one model, or open **Compare models** in the left sidebar to evaluate the same input with two different registered models. The comparison page is also available at `/playground/#/compare` and requires at least two registered models. Switching pages keeps each page's draft and completed results until you reload.
