@@ -2,7 +2,7 @@
 
 [Back to README](../README.md#http-interfaces)
 
-The Playground is a small browser interface for trying one Jev Choice, Score, or Noul decision at a time. It calls the same `/v1/models` and `/v1/systemone` endpoints as other HTTP clients.
+The Playground is a small browser interface for trying Jev Choice, Score, or Noul decisions. It calls the same `/v1/models` and `/v1/systemone` endpoints as other HTTP clients.
 
 From the project root, install local inference and server dependencies with the [tested model constraints](../README.md#installation):
 
@@ -24,6 +24,8 @@ Open <http://127.0.0.1:8000/playground/>. `--playground` starts the HTTP server;
 
 Use **Playground** for one model, or open **Compare models** in the left sidebar to evaluate the same input with two different registered models. The comparison page is also available at `/playground/#/compare` and requires at least two registered models. Switching pages keeps each page's draft and completed results until you reload.
 
+Use **Compose workflow** at `/playground/#/compose` to build a recursive decision tree from Choice, Score, and Noul nodes. The root may be any of the three types. Every result branch can contain more nodes at any depth, and each node needs a unique question ID. The JSON view exports `version`, `model`, `state`, and the nested `root`; **Copy**, **Download**, and **Download JSON Schema** make the configuration reusable from application code. Running the workflow evaluates one active node at a time and follows only the branch selected by the model.
+
 **Game Lab** at `/playground/#/games` lets a model play four small, monochrome pixel games: Dino jump, Tetris-style falling blocks, Snake, and Racing. Choose a game and model, then step through moves or select **Play to the end** for a complete run. Every move comes from the selected embedding model through the same Choice API; the simulator supplies observations and applies the returned action. The board, move, probabilities, latency, and game score update together. Use **Replay the same start** to try another model on identical initial conditions; **New run** changes the starting seed. Runs stop after at most 12 turns. Falling blocks use fixed piece orientations. Tetris-style blocks and Snake show game outcomes rather than an artificial per-move accuracy label.
 
 The simulator also describes immediate observations: Dino reports whether a cactus arrives this turn and whether jumping is available; Snake describes each candidate's adjacent cell and whether it moves closer to food. These descriptions use the game state, without choosing or replacing the model's action. Dino has a one-turn landing cooldown after each jump. Open **See what the model reads** to inspect the exact input.
@@ -33,3 +35,5 @@ Choose a preset, edit the state, instructions, and criteria, and run the example
 If you know the expected answer, correct the label and export that **one labeled example** as JSONL for the [training supervision format](training.md#supervision-format-and-objectives). The corrected label is the training `answers` field; `metadata.predictions` keeps the original response for each model that finished (one in Playground, up to two in Compare). The trainer ignores metadata. A model comparison is a demonstration on one case, not dataset accuracy. The elapsed time includes browser and network overhead and may include model loading and cache effects; the two models run sequentially. It is not a benchmark.
 
 The Playground uses the server's existing [request limits and responses](http.md#limits-and-responses), including 413 for oversized work. Requests sent from the browser are handled by the selected server. Keep the default local bind address for a local demo; if you expose the server on a network, treat submitted states as data sent to that server.
+
+The map shows the hierarchy as an XMind-style graph. Drag the bottom-right corner of the **Decision map** canvas to adjust its height, just like resizing the State input; its width follows the page layout. Drag a node by its `MOVE` handle onto a result branch to reparent it, or choose a result in the inspector on smaller screens. **Global preview** fits the complete graph across the workspace; **JSON** edits and validates the complete recursive configuration. The browser sends a single active question for each visited node, preserving the exported tree while avoiding requests for skipped branches.

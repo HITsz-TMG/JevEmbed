@@ -1,5 +1,6 @@
-import {PRESETS, buildQuestion, buildRequest, comparison, hardPrediction, labelsForQuestion, scoreSummary, simpleCriteriaText, trainingRecord} from "./logic.mjs";
-import {initGames} from "./games.js";
+import {PRESETS, buildQuestion, buildRequest, comparison, hardPrediction, labelsForQuestion, preferredModelId, scoreSummary, simpleCriteriaText, trainingRecord} from "./logic.mjs?v=20261003-composer8";
+import {initGames} from "./games.js?v=20261001-composer4";
+import {initComposer} from "./composer.js?v=20261003-composer8";
 
 const $ = id => document.getElementById(id);
 const ui = {
@@ -18,11 +19,13 @@ const ui = {
   results: document.querySelector(".results"), busy: $("busy-indicator"), busyTitle: $("busy-title"), busyContext: $("busy-context"),
   previous: $("previous-note"), correct: $("correct-answer"), export: $("export"),
   decisionWorkspace: $("decision-workspace"), gameLab: $("game-lab"), gameModel: $("game-model"),
+  compositionWorkspace: $("composition-workspace"),
 };
 
 const MODULES = [
   {id: "playground", label: "Playground", href: "#/playground"},
   {id: "compare", label: "Compare models", href: "#/compare"},
+  {id: "compose", label: "Compose workflow", href: "#/compose"},
   {id: "games", label: "Game Lab", href: "#/games"},
 ];
 const mobileNavQuery = window.matchMedia("(max-width: 900px)");
@@ -49,11 +52,13 @@ const comboboxes = new Map();
 const games = initGames();
 let openCombobox = null;
 let lastPointerPosition = null;
+const composer = initComposer(document.getElementById("composer-root"));
 
 function routeFromHash() { return location.hash === "#/compare" ? "compare" :
-  location.hash === "#/games" ? "games" : "playground"; }
+  location.hash === "#/compose" ? "compose" : location.hash === "#/games" ? "games" : "playground"; }
 function isCompare() { return activePage === "compare"; }
 function isGame() { return activePage === "games"; }
+function isCompose() { return activePage === "compose"; }
 
 function cancelAnimations() {
   for (const animation of animations) animation.cancel();
@@ -111,6 +116,12 @@ function initializeModules() {
       }
     } else if (module.id === "compare") {
       for (const d of ["M3 7h6v10H3z", "M15 7h6v10h-6z", "M9 12h6", "m12 9 3 3-3 3"]) {
+        const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+        path.setAttribute("d", d);
+        icon.append(path);
+      }
+    } else if (module.id === "compose") {
+      for (const d of ["M3 9h6v6H3z", "M16 3h5v5h-5z", "M16 16h5v5h-5z", "M9 12h4V5.5h3", "M13 12v6.5h3"]) {
         const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
         path.setAttribute("d", d);
         icon.append(path);
@@ -177,8 +188,7 @@ function restore(page) {
 
 function applyRoute(focus = false) {
   closeCombobox();
-  if (location.hash && location.hash !== "#/playground" && location.hash !== "#/compare" &&
-      location.hash !== "#/games") {
+  if (location.hash && !["#/playground", "#/compare", "#/compose", "#/games"].includes(location.hash)) {
     history.replaceState(null, "", `${location.pathname}${location.search}#/playground`);
   }
   const page = routeFromHash();
@@ -192,22 +202,25 @@ function applyRoute(focus = false) {
   }
   if (routeInitialized) {
     if (activePage === "games") games.hide();
+    else if (activePage === "compose") composer.hide();
     else pages[activePage] = snapshot();
   }
   activePage = page;
   routeInitialized = true;
   ui.appShell.classList.toggle("compare-page", isCompare());
   ui.appShell.classList.toggle("game-page", isGame());
-  ui.decisionWorkspace.hidden = isGame();
+  ui.appShell.classList.toggle("compose-page", isCompose());
+  ui.decisionWorkspace.hidden = isGame() || isCompose();
   ui.gameLab.hidden = !isGame();
+  ui.compositionWorkspace.hidden = !isCompose();
   for (const link of ui.moduleList.querySelectorAll(".module-link")) {
     if (link.dataset.module === page) link.setAttribute("aria-current", "page");
     else link.removeAttribute("aria-current");
   }
-  ui.moduleTitle.textContent = isGame() ? "Game Lab" : isCompare() ? "Compare models" : "Playground";
+  ui.moduleTitle.textContent = isGame() ? "Game Lab" : isCompose() ? "Compose workflow" : isCompare() ? "Compare models" : "Playground";
   document.title = `${ui.moduleTitle.textContent} · JevEmbed`;
   ui.introLede.textContent = isGame() ? "See how a model plays four tiny pixel games, one turn at a time." :
-    isCompare() ? "See how two models answer the same question." : "Try a rule and see how the model weighs each option.";
+    isCompose() ? "Combine Jev primitives into one reusable decision workflow." : isCompare() ? "See how two models answer the same question." : "Try a rule and see how the model weighs each option.";
   if (isGame()) {
     games.show();
     if (focus) {
@@ -215,6 +228,10 @@ function applyRoute(focus = false) {
       heading.tabIndex = -1;
       heading.focus({preventScroll: true});
     }
+    return;
+  }
+  if (isCompose()) {
+    composer.show();
     return;
   }
   ui.modelLabel.textContent = isCompare() ? "Model A" : "Model";
@@ -740,16 +757,20 @@ async function loadModels() {
       ui.model.append(option("", "No models available"));
       ui.compareModel.append(option("", "No models available"));
     } else {
+      const preferredModel = preferredModelId(models);
       if (models.some(entry => entry.id === selectedModel)) ui.model.value = selectedModel;
+      else ui.model.value = preferredModel;
       if (models.some(entry => entry.id === selectedCompareModel)) ui.compareModel.value = selectedCompareModel;
       else if (models.length > 1) ui.compareModel.selectedIndex = 1;
     }
     games.setModels(models.map(entry => entry.id));
+    composer.setModels(models);
   } catch (error) {
     modelLoadError = error.message;
     ui.model.replaceChildren(option("", "Models unavailable"));
     ui.compareModel.replaceChildren(option("", "Models unavailable"));
     games.setModels([]);
+    composer.setModels([], error.message);
   }
   modelsLoaded = true;
   updateModelMessage();

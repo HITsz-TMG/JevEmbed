@@ -5,9 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#ffffff">
   <title>Playground · JevEmbed</title>
-  <link rel="stylesheet" href="./style.css">
-  <link rel="stylesheet" href="./games.css">
-  <script type="module" src="./app.js"></script>
+  <link rel="stylesheet" href="./style.css?v=20261001-composer4">
+  <link rel="stylesheet" href="./games.css?v=20261001-composer4">
+  <link rel="stylesheet" href="./composer.css?v=20261003-composer9">
+  <script type="module" src="./app.js?v=20261003-composer8"></script>
 </head>
 <body>
   <div id="app-shell" class="app-shell">
@@ -60,6 +61,7 @@
           </div>
         </section>
       </div>
+      <section id="composition-workspace" class="composition-workspace" hidden aria-label="Decision workflow editor"><div id="composer-root"></div></section>
       <section id="game-lab" class="game-lab" aria-label="Game Lab" hidden>
         <div class="game-lab-heading"><div><h2>Every move is a model decision.</h2><p>Pick a game and an embedding model.</p></div></div>
         <div class="game-picker" role="group" aria-label="Choose a game">

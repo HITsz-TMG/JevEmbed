@@ -98,6 +98,200 @@ export function buildRequest({model, state, jsonState, type, instructions, crite
   return {model, state: content, questions: {decision: buildQuestion({type, instructions, criteria, advanced})}};
 }
 
+export const COMPOSITION_LIMITS = {maxDepth: 128, maxNodes: 2048};
+
+function parseCompositionState(state, jsonState) {
+  let content = state;
+  if (jsonState) {
+    try { content = JSON.parse(state); }
+    catch { throw new Error("State must be valid JSON."); }
+  }
+  if (!isContent(content)) throw new Error("State must be text, an object, or an array.");
+  if (typeof content === "string" && !content.trim()) throw new Error("Add a state to evaluate.");
+  requireFiniteNumbers(content, "State");
+  return content;
+}
+
+function normalizeNodeId(value, fallback) {
+  const id = value === undefined && fallback ? fallback : value;
+  if (typeof id !== "string" || !/^[A-Za-z][A-Za-z0-9_-]*$/.test(id))
+    throw new Error("Node IDs must start with a letter and use letters, numbers, _ or -.");
+  return id;
+}
+
+function compositionQuestion(node, drafts) {
+  if (drafts && typeof node.criteria === "string") {
+    let instructions = node.instructions;
+    if (node.instructionsAdvanced) {
+      try { instructions = JSON.parse(instructions); }
+      catch { throw new Error("Instructions must be valid JSON."); }
+    }
+    if (!isContent(instructions) || typeof instructions === "string" && !instructions.trim())
+      throw new Error("Add a question or instruction.");
+    const question = buildQuestion({...node,
+      instructions: typeof instructions === "string" ? instructions : "Structured instructions"});
+    question.instructions = structuredClone(instructions);
+    requireFiniteNumbers(question, "Question");
+    return question;
+  }
+  if (!["choice", "score", "noul"].includes(node.type)) throw new Error("Choose a question type.");
+  if (!isContent(node.instructions) || typeof node.instructions === "string" && !node.instructions.trim())
+    throw new Error("Add a question or instruction.");
+  const question = {type: node.type, instructions: structuredClone(node.instructions)};
+  if (node.type === "choice") {
+    if (!node.criteria || Array.isArray(node.criteria) || typeof node.criteria !== "object" ||
+        !Object.keys(node.criteria).length || Object.keys(node.criteria).some(label => !label.trim()) ||
+        Object.values(node.criteria).some(value => value !== null && !isContent(value)))
+      throw new Error("Choice criteria must be a nonempty object of named descriptions.");
+    question.criteria = structuredClone(node.criteria);
+  } else if (node.type === "score") {
+    if (!Array.isArray(node.criteria) || node.criteria.length < 2 || node.criteria.length > 10 ||
+        node.criteria.some(value => !isContent(value)))
+      throw new Error("Score criteria must contain 2 to 10 ordered descriptions.");
+    question.criteria = structuredClone(node.criteria);
+  } else if (Object.hasOwn(node, "criteria")) {
+    if (!node.criteria || Array.isArray(node.criteria) || typeof node.criteria !== "object" ||
+        Object.keys(node.criteria).sort().join() !== "false,true" ||
+        Object.values(node.criteria).some(value => !isContent(value)))
+      throw new Error("Omit Noul criteria or supply both true and false descriptions.");
+    question.criteria = structuredClone(node.criteria);
+  }
+  requireFiniteNumbers(question, "Question");
+  return question;
+}
+
+function serializeCompositionNode(root, drafts) {
+  const seenIds = new Set();
+  const seenNodes = new WeakSet();
+  let count = 0;
+  function visit(node, depth) {
+    if (!node || typeof node !== "object" || Array.isArray(node))
+      throw new Error("Every workflow node must be an object.");
+    if (seenNodes.has(node)) throw new Error("Workflow nodes must form a tree without cycles or shared nodes.");
+    seenNodes.add(node);
+    if (depth >= COMPOSITION_LIMITS.maxDepth)
+      throw new Error("Workflow nesting is limited to " + COMPOSITION_LIMITS.maxDepth + " levels.");
+    count += 1;
+    if (count > COMPOSITION_LIMITS.maxNodes)
+      throw new Error("Workflow cannot contain more than " + COMPOSITION_LIMITS.maxNodes + " nodes.");
+    if (!drafts && Object.keys(node).some(key => !["id", "type", "instructions", "criteria", "children"].includes(key)))
+      throw new Error("Workflow node contains unsupported fields.");
+    const id = normalizeNodeId(node.id, drafts ? "decision_" + count : undefined);
+    if (seenIds.has(id)) throw new Error('Node ID "' + id + '" must be unique.');
+    seenIds.add(id);
+    const question = compositionQuestion(node, drafts);
+    const labels = labelsForQuestion(question);
+    const children = node.children === undefined ? {} : node.children;
+    if (!children || typeof children !== "object" || Array.isArray(children))
+      throw new Error('Children for "' + id + '" must be an object keyed by prediction label.');
+    const branches = [];
+    for (const [label, nodes] of Object.entries(children)) {
+      if (!labels.includes(label)) throw new Error('Node "' + id + '" has an invalid branch "' + label + '".');
+      if (!Array.isArray(nodes)) throw new Error('Branch "' + label + '" must contain an array of nodes.');
+      if (nodes.length) branches.push([label, nodes.map(child => visit(child, depth + 1))]);
+    }
+    const result = {id, ...question};
+    if (branches.length) result.children = Object.fromEntries(branches);
+    return result;
+  }
+  return visit(root, 0);
+}
+
+export function buildCompositionConfig({model, state, jsonState, root}) {
+  if (typeof model !== "string" || !model.trim()) throw new Error("Choose a model.");
+  return {version: 1, model, state: parseCompositionState(state, jsonState),
+    root: serializeCompositionNode(root, true)};
+}
+
+export function validateCompositionConfig(config) {
+  if (!config || typeof config !== "object" || Array.isArray(config) ||
+      Object.keys(config).some(key => !["version", "model", "state", "root"].includes(key)))
+    throw new Error("A workflow needs only version, model, state, and root.");
+  if (config.version !== 1) throw new Error("Unsupported workflow version. Expected version 1.");
+  if (typeof config.model !== "string" || !config.model.trim()) throw new Error("Choose a model.");
+  try { JSON.stringify(config); }
+  catch { throw new Error("Workflow must be JSON without circular references."); }
+  return {version: 1, model: config.model,
+    state: structuredClone(parseCompositionState(config.state, false)),
+    root: serializeCompositionNode(config.root, false)};
+}
+
+export function flattenCompositionConfig(config) {
+  const checked = validateCompositionConfig(config);
+  const entries = [];
+  function visit(node) {
+    const {id, children, ...question} = node;
+    entries.push([id, question]);
+    for (const nodes of Object.values(children || {})) nodes.forEach(visit);
+  }
+  visit(checked.root);
+  return {model: checked.model, state: checked.state, questions: Object.fromEntries(entries)};
+}
+
+export function buildCompositionRequest({model, state, jsonState, steps, root}) {
+  if (root) return flattenCompositionConfig(buildCompositionConfig({model, state, jsonState, root}));
+  if (typeof model !== "string" || !model.trim()) throw new Error("Choose a model.");
+  const content = parseCompositionState(state, jsonState);
+  if (!Array.isArray(steps) || !steps.length) throw new Error("Add at least one decision step.");
+  const ids = new Set();
+  const questions = steps.map((step, index) => {
+    const id = normalizeNodeId(step.id, "decision_" + (index + 1));
+    if (ids.has(id)) throw new Error('Step ID "' + id + '" must be unique.');
+    ids.add(id);
+    return [id, buildQuestion(step)];
+  });
+  return {model, state: content, questions: Object.fromEntries(questions)};
+}
+
+export const COMPOSITION_SCHEMA = {
+  $schema: "https://json-schema.org/draft/2020-12/schema",
+  title: "JevEmbed recursive decision workflow",
+  type: "object",
+  additionalProperties: false,
+  required: ["version", "model", "state", "root"],
+  properties: {
+    version: {const: 1}, model: {type: "string", minLength: 1},
+    state: {$ref: "#/$defs/content"}, root: {$ref: "#/$defs/node"}
+  },
+  $defs: {
+    content: {type: ["string", "object", "array"]},
+    choiceDescription: {type: ["string", "object", "array", "null"]},
+    children: {type: "object", additionalProperties: {type: "array", items: {$ref: "#/$defs/node"}}},
+    node: {
+      type: "object", additionalProperties: false, required: ["id", "type", "instructions"],
+      properties: {
+        id: {type: "string", pattern: "^[A-Za-z][A-Za-z0-9_-]*$"},
+        type: {enum: ["choice", "score", "noul"]},
+        instructions: {$ref: "#/$defs/content"},
+        criteria: {},
+        children: {$ref: "#/$defs/children"}
+      },
+      allOf: [
+        {if: {properties: {type: {const: "choice"}}}, then: {
+          required: ["criteria"], properties: {criteria: {type: "object", minProperties: 1,
+            propertyNames: {pattern: "\\S"}, additionalProperties: {$ref: "#/$defs/choiceDescription"}}}
+        }},
+        {if: {properties: {type: {const: "score"}}}, then: {
+          required: ["criteria"], properties: {criteria: {type: "array", minItems: 2, maxItems: 10,
+            items: {$ref: "#/$defs/content"}}, children: {propertyNames: {pattern: "^[0-9]$"}}}
+        }},
+        {if: {properties: {type: {const: "noul"}}}, then: {
+          properties: {
+            criteria: {type: "object", additionalProperties: false, required: ["true", "false"],
+              properties: {true: {$ref: "#/$defs/content"}, false: {$ref: "#/$defs/content"}}},
+            children: {propertyNames: {enum: ["true", "false"]}}
+          }
+        }}
+      ]
+    }
+  }
+};
+
+export function preferredModelId(models) {
+  const entries = Array.isArray(models) ? models.filter(entry => entry && typeof entry.id === "string" && entry.id) : [];
+  return entries.find(entry => /jevembed/i.test(entry.id))?.id || entries[0]?.id || "";
+}
+
 export function labelsForQuestion(question) {
   if (question.type === "choice") return Object.keys(question.criteria);
   if (question.type === "score") return question.criteria.map((_, index) => String(index));
