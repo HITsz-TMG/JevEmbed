@@ -39,6 +39,10 @@ def serialize(value):
 def serialize_for_mode(value, mode):
     if mode == "compact_json":
         return serialize(value)
+    if mode == "compact_json_ordered":
+        validate_json(value)
+        return value if isinstance(value, str) else json.dumps(
+            value, ensure_ascii=False, separators=(",", ":"), allow_nan=False)
     if mode != "prose":
         raise ValidationError(f"Unknown serialization mode: {mode}")
     validate_json(value)

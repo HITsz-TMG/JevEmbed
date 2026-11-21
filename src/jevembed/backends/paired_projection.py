@@ -1,15 +1,19 @@
 """A configurable text encoder with separate query and document projection heads."""
 
 from dataclasses import replace
+import json
 import hashlib
 import importlib.metadata
+import math
 from pathlib import Path
 import threading
 
 from .base import EmbeddingBatch
 from ..config import ModelConfig
+from ..config import LogisticConfig
 from ..errors import BackendError, ValidationError
 from ..prompts import PromptAdapter
+from .clm_qwen35 import render_query
 
 
 def _make_head(nn, *, hidden, width, depth, projection, activation, layernorm, residual):
@@ -61,6 +65,7 @@ class PairedProjectionBackend:
         self._heads = None
         self._device = None
         self._limit = None
+        self._scale = None
         self.metadata = {}
 
     def _checkpoint_path(self):
@@ -123,6 +128,11 @@ class PairedProjectionBackend:
             if cfg.expected_dimension and cfg.expected_dimension != projection:
                 raise BackendError(f"Expected dimension {cfg.expected_dimension}, got {projection}")
             scale = float(torch.as_tensor(checkpoint["logit_scale"]).float().exp().clamp(max=100.0))
+            if not math.isfinite(scale) or scale <= 0:
+                raise BackendError("Projection checkpoint has an invalid logit scale")
+            if cfg.prompts.version == "clm-qwen35-chat-options-v1":
+                if abs(cfg.scoring.choice_temperature - 1.0 / scale) > 1e-4:
+                    raise BackendError("CLM scoring temperature must match the pinned head logit_scale")
             for head in heads.values():
                 head.eval().to(device=device, dtype=torch.float32)
         except (KeyError, ValueError, TypeError, RuntimeError) as exc:
@@ -137,7 +147,10 @@ class PairedProjectionBackend:
             tokenizer = AutoTokenizer.from_pretrained(cfg.model_name_or_path, revision=cfg.revision,
                                                        trust_remote_code=cfg.trust_remote_code,
                                                        local_files_only=cfg.local_files_only)
-            model = AutoModel.from_pretrained(cfg.model_name_or_path, **model_kwargs).eval().to(device)
+            model = AutoModel.from_pretrained(cfg.model_name_or_path, **model_kwargs).eval()
+            if getattr(model.config, "model_type", None) == "qwen3_5":
+                model = model.language_model
+            model = model.to(device)
             model.config.use_cache = False
             if int(model.config.hidden_size) != hidden:
                 raise BackendError(f"Base model hidden size {model.config.hidden_size} differs from checkpoint {hidden}")
@@ -176,6 +189,15 @@ class PairedProjectionBackend:
         }
         self._model, self._tokenizer, self._heads = model, tokenizer, heads
         self._device, self._limit = device, limit
+        self._scale = scale
+
+    def scoring_config(self):
+        if self.config.prompts.version != "clm-qwen35-chat-options-v1":
+            return self.config.scoring
+        return replace(self.config.scoring, choice_temperature=1 / self._scale,
+                       score_temperature=1 / self._scale,
+                       noul_with_criteria=LogisticConfig(self._scale, 0.0),
+                       noul_without_criteria=LogisticConfig(self._scale, 0.0))
 
     def encode(self, items):
         with self._lock:
@@ -184,7 +206,20 @@ class PairedProjectionBackend:
             import torch.nn.functional as functional
 
             cfg, tokenizer = self.config, self._tokenizer
-            texts = [self.adapter.render(item) for item in items]
+            texts, special_truncations = [], {}
+            for index, item in enumerate(items):
+                if item.role == "query" and cfg.prompts.version == "clm-qwen35-chat-options-v1":
+                    try:
+                        payload = json.loads(item.text)
+                        rendered, truncation = render_query(
+                            tokenizer, payload, max_tokens=self._limit, overflow_policy=cfg.overflow_policy)
+                    except Exception as exc:
+                        raise BackendError(f"Cannot render CLM-Qwen3.5 chat-options input: {exc}") from exc
+                    texts.append(rendered)
+                    if truncation:
+                        special_truncations[index] = truncation
+                else:
+                    texts.append(self.adapter.render(item))
             encoded = tokenizer(texts, add_special_tokens=False, padding=False, truncation=False)["input_ids"]
             token_lists, truncated = [], []
             for index, (item, ids) in enumerate(zip(items, encoded)):
@@ -193,7 +228,10 @@ class PairedProjectionBackend:
                 if not ids:
                     ids = tokenizer(" ", add_special_tokens=False)["input_ids"]
                 original = len(ids)
-                if original > self._limit:
+                if index in special_truncations:
+                    truncated.append({"index": index, "original_tokens": special_truncations[index]["original_tokens"],
+                                      "encoded_tokens": original, "kept": special_truncations[index]["kept"]})
+                elif original > self._limit:
                     if cfg.overflow_policy == "error":
                         raise ValidationError(f"Input {index} exceeds {self._limit} tokens ({original})")
                     side = cfg.query_truncation_side if item.role == "query" else cfg.document_truncation_side

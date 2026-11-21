@@ -29,3 +29,6 @@ checkpoint-*/
 .coverage
 htmlcov/
 .DS_Store
+
+.venv-*/
+/results/

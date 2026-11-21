@@ -1,0 +1,28 @@
+{
+  "model": "qnaug-embeddinggemma2-decision",
+  "state": {
+    "ticket": "The same order was charged twice.",
+    "customer": "A refund was requested today.",
+    "impact": "The customer can still use the account."
+  },
+  "questions": {
+    "team": {
+      "type": "choice",
+      "instructions": "Which team should handle this request?",
+      "criteria": {
+        "billing": "Payments, invoices, duplicate charges and refunds.",
+        "technical": "Bugs, outages and broken product behavior.",
+        "general": "Other customer support requests."
+      }
+    },
+    "urgent": {
+      "type": "noul",
+      "instructions": "Does this require immediate attention?"
+    },
+    "severity": {
+      "type": "score",
+      "instructions": "How severe is the customer impact?",
+      "criteria": ["Minor", "Moderate", "Severe"]
+    }
+  }
+}

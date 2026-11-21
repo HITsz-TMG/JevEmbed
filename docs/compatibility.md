@@ -52,3 +52,16 @@ CLM-v0.1-8B uses separate state/action projections and [model-specific prompts](
 The tested stack uses PyTorch 2.8.0, Transformers 4.51.0, sentence-transformers 5.3.0, NumPy 1.26.4, and PyYAML 6.0.3. Transformers 4.51.0 is pinned for KaLM-embedding-multilingual-mini-instruct-v2.5 compatibility. Choose a PyTorch wheel for your hardware; CPU inference needs no FlashAttention.
 
 Optional [LoRA training](training.md) supports the Sentence Transformers models on one or more GPUs; CLM's paired-projection backend is inference-only. Automatic prompt optimization and scalar calibration fitting are not implemented. The [JevEmbed-Data test results](../reports/JEVEMBED_DATA_TEST.md) compare the six base models and three fine-tuned models. Separate [KaLM](../reports/OPEN_JEV_KALM_LORA.md) and [Qwen3 0.6B](../reports/OPEN_JEV_QWEN3_0.6B_LORA.md) reports compare base and LoRA models on Open-Jev validation.
+
+## Decision model runtimes
+
+Use isolated environments for the following extras. Do not install their incompatible Transformers requirements together.
+
+| Extra | Models | Runtime |
+| --- | --- | --- |
+| `clm,jeva` | CLM-Qwen3.5-2B and Jeva-4B | Python 3.12, Torch 2.9.1, Transformers 5.17.0 |
+| `gemma-decision` | mrm8488 and qnaug EmbeddingGemma decision heads | Torch 2.10 or later, Transformers 5.19.0; BF16 or FP32 |
+| `kanana` | Kanana-2-v-decide-3b-2611 | Torch 2.10.0, Transformers 5.5.3 |
+| `local` with tested constraints | Nemotron and original embedding configurations | Torch 2.8.0, Transformers 4.51.0, Sentence Transformers 5.3.0 |
+
+Kanana and mrm8488 use pinned remote modeling code; Nemotron preserves its repository-provided modules. Jeva and qnaug use local adapters or an installed pinned runtime. These integrations accept text/JSON; checkpoint image or multimedia support is not exposed by the JevEmbed schema. mrm8488's native API rejects custom Noul criteria. Native heads own their probability and cache behavior; see the model guides for restrictions and validation scope.

@@ -64,8 +64,12 @@ def score_plan(plan, vectors, config, confidence_estimator=None):
     query = vectors[0]
     similarities = [min(1.0, max(-1.0, math.fsum(a*b for a, b in zip(query, vector)))) for vector in vectors[1:]]
     if plan.kind == "noul":
-        parameters = getattr(config, plan.path)
-        value = similarities[0] if len(similarities) == 1 else similarities[0] - similarities[1]
+        if plan.path == "clm_noul":
+            parameters = config.noul_without_criteria
+            value = similarities[1] - similarities[0]
+        else:
+            parameters = getattr(config, plan.path)
+            value = similarities[0] if len(similarities) == 1 else similarities[0] - similarities[1]
         answer = {"type": "noul", "noul": sigmoid(parameters.slope * value + parameters.intercept)}
     else:
         probabilities = softmax(similarities, getattr(config, f"{plan.kind}_temperature"))

@@ -7,6 +7,12 @@ These examples are organized by task and shared by all supported models.
 | `official_choice_exchange.json` | Route a shoe exchange request | Choice |
 | `official_score_safari.json` | Assess a Safari bug's severity | Score |
 | `official_noul_escalation.json` | Detect human escalation and repeat contact | Noul with and without criteria |
+| `embeddinggemma_decide.json` | Typed support-ticket decision using EmbeddingGemma 2 | Choice, Score, Noul |
+| `qnaug_embeddinggemma_decide.json` | Typed support-ticket decision using the Clef head | Choice, Score, Noul |
+| `clm_qwen35_decide.json` | State and ordered options rendered with CLM's chat template | Choice, Score, Noul |
+| `jeva_decide.json` | State-aware decisions from Jeva's native matrix head | Choice, Score, Noul |
+| `kanana_decide.json` | State and candidate vectors from Kanana 2 V Decide | Choice, Score, Noul |
+| `nemotron_decide.json` | General multilingual retrieval baseline | Choice, Score, Noul |
 
 The JSON files default to `model: kalm-embedding-v2.5`. To switch models, change only `model` and load the corresponding configuration. Keep state, instructions, and criteria unchanged.
 

@@ -1,0 +1,22 @@
+# Jeva returns set-aware typed decisions through its released native head.
+model_id: jeva-4b
+backend: jeva_decide
+model_name_or_path: LIQIIIII/Jeva-4B
+revision: f78e14e2e9c55e1b6aa1d6a3256ae78b763ac6d1
+aliases: [LIQIIIII/Jeva-4B]
+trust_remote_code: false
+local_files_only: false
+device: cuda
+dtype: bfloat16
+batch_size: 1
+max_input_tokens: 16384
+overflow_policy: error
+prompts:
+  version: jeva-native-v1
+scoring:
+  choice_temperature: 1.0
+  score_temperature: 1.0
+  noul_with_criteria: {slope: 1.0, intercept: 0.0}
+  noul_without_criteria: {slope: 1.0, intercept: 0.0}
+  confidence: top_margin
+  calibration_status: upstream_checkpoint
