@@ -1,4 +1,4 @@
-"""Run the five deployment examples in isolated processes and check their outputs.
+"""Run the four deployment examples in isolated processes and check their outputs.
 
 Each environment is selected explicitly because the model groups require
 different Transformers versions. --explain checks compilation only, without
@@ -18,7 +18,6 @@ MODELS = (
     ("embeddinggemma-2-ft-typed-decision", "embeddinggemma_decide.json", "gemma"),
     ("jeva-4b", "jeva_decide.json", "decision"),
     ("qnaug-embeddinggemma2-decision", "qnaug_embeddinggemma_decide.json", "gemma"),
-    ("nemotron-embed-1b-v2", "nemotron_decide.json", "standard"),
 )
 
 
@@ -58,7 +57,7 @@ def validate_response(response, request):
 
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
-    for group, suffix in (("decision", "decision"), ("gemma", "gemma"), ("standard", "standard")):
+    for group, suffix in (("decision", "decision"), ("gemma", "gemma")):
         parser.add_argument(f"--{group}-python", type=Path,
                             help=f"Python executable for the {suffix} model environment")
     parser.add_argument("--model", choices=[entry[0] for entry in MODELS], action="append")

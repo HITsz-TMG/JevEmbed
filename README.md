@@ -157,14 +157,13 @@ Supported models are listed below. Configurations use Hugging Face repository ID
 | [kakaocorp/kanana-2-v-decide-3b-2611](https://huggingface.co/kakaocorp/kanana-2-v-decide-3b-2611) | `kanana-2-v-decide-3b-2611` | 2,560 | 20,480 | Native state/candidate vectors |
 | [mrm8488/embeddinggemma-2-ft-typed-decision](https://huggingface.co/mrm8488/embeddinggemma-2-ft-typed-decision) | `embeddinggemma-2-ft-typed-decision` | 768 | 8,192 | Separate state/question/option pooling + native head |
 | [qnaug/embeddinggemma2-decision](https://huggingface.co/qnaug/embeddinggemma2-decision) | `qnaug-embeddinggemma2-decision` | 768 | 1,024 | Joint question/option spans + local head |
-| [nvidia/llama-nemotron-embed-1b-v2](https://huggingface.co/nvidia/llama-nemotron-embed-1b-v2) | `nemotron-embed-1b-v2` | 2,048 | 8,192 | Model default |
 | [HIT-TMG/JevEmbed-KaLM-Embedding-V2.5](https://huggingface.co/HIT-TMG/JevEmbed-KaLM-Embedding-V2.5) | `jevembed-kalm-embedding-v2.5` | 896 | 1,024 | Mean |
 | [HIT-TMG/JevEmbed-Qwen3-Embedding-0.6B](https://huggingface.co/HIT-TMG/JevEmbed-Qwen3-Embedding-0.6B) | `jevembed-qwen3-embedding-0.6b` | 1,024 | 1,024 | Last-token |
 | [HIT-TMG/JevEmbed-Qwen3-Embedding-4B](https://huggingface.co/HIT-TMG/JevEmbed-Qwen3-Embedding-4B) | `jevembed-qwen3-embedding-4b` | 2,560 | 1,024 | Last-token |
 
 CLM-v0.1-8B uses [Qwen/Qwen3-8B](https://huggingface.co/Qwen/Qwen3-8B) as its base encoder with separate state and action projection heads.
 
-The decision integrations retain released heads and rendering: [CLM Qwen3.5 and Jeva](docs/clm-qwen35-and-jeva.md), [Kanana](docs/kanana.md), and [two EmbeddingGemma variants](docs/new-embedding-models.md). Their model extras need separate compatible environments; core installation and `--explain` still require no model libraries. Nemotron is a general retrieval baseline with uncalibrated Jev scoring, rather than a Jev-trained decision checkpoint.
+The decision integrations retain released heads and rendering: [CLM Qwen3.5 and Jeva](docs/clm-qwen35-and-jeva.md), [Kanana](docs/kanana.md), and [two EmbeddingGemma variants](docs/new-embedding-models.md). Their model extras need separate compatible environments; core installation and `--explain` still require no model libraries.
 
 The model configuration pages document runtimes and local inference. Adapter tests and offline compilation do not establish full-checkpoint GPU performance or accuracy.
 

@@ -19,7 +19,6 @@ MODEL_IDS = (
     "jeva-4b",
     "embeddinggemma-2-ft-typed-decision",
     "qnaug-embeddinggemma2-decision",
-    "nemotron-embed-1b-v2",
 )
 # Keep native PyTorch runtime files, tokenizer data and licensing material.
 # Skip export directories to avoid downloading multiple copies of the weights.
@@ -58,7 +57,7 @@ def main():
     parser.add_argument("action", choices=("download", "local-configs"))
     parser.add_argument("--weights-dir", type=Path, required=True)
     parser.add_argument("--model", choices=MODEL_IDS, action="append",
-                        help="Repeat to select models; defaults to the five deployment targets")
+                        help="Repeat to select models; defaults to the four deployment targets")
     parser.add_argument("--output-dir", type=Path, default=ROOT / "configs/local")
     args = parser.parse_args()
     weights_dir = args.weights_dir.expanduser().resolve()
@@ -121,10 +120,6 @@ def main():
             if not all(path.is_file() and path.stat().st_size for path in required):
                 raise FileNotFoundError(f"Incomplete Clef Gemma assets under {directory}")
             weight_root = directory / "encoder"
-        else:
-            if not (directory / "config.json").is_file():
-                raise FileNotFoundError(f"Missing {directory / 'config.json'}")
-            weight_root = directory
         if weight_root is not None and not any(path.stat().st_size for path in weight_root.rglob("*.safetensors")):
             raise FileNotFoundError(f"No nonempty safetensors weights in {weight_root}")
         for index_file in weight_root.rglob("*.safetensors.index.json") if weight_root is not None else ():

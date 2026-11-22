@@ -48,24 +48,24 @@ def test_jeva_local_config_distinguishes_external_and_complete_local_backbones(t
 def test_deployment_examples_compile_in_subprocesses_without_weights(tmp_path):
     smoke = load_script("smoke_a100_models")
     argv = ["--explain", "--output-dir", str(tmp_path)]
-    for name in ("decision", "gemma", "standard"):
+    for name in ("decision", "gemma"):
         argv.extend([f"--{name}-python", sys.executable])
     assert smoke.main(argv) == 0
     result = json.loads((tmp_path / "summary.json").read_text())
     assert result["mode"] == "compile_only" and result["ok"]
-    assert len(result["models"]) == 5
+    assert len(result["models"]) == 4
     assert all(row["status"] == "compiled" for row in result["models"])
 
 
 def test_smoke_failure_cannot_reuse_an_old_success_output(tmp_path, monkeypatch):
     smoke = load_script("smoke_a100_models")
-    model_id = "nemotron-embed-1b-v2"
+    model_id = "clm-qwen3.5-2b"
     stale = tmp_path / f"{model_id}.json"
     stale.write_text('{"model":"stale"}')
     monkeypatch.setattr(smoke.subprocess, "run", lambda *args, **kwargs: SimpleNamespace(
         returncode=2, stdout="", stderr="Model load failed"))
     assert smoke.main(["--model", model_id, "--configs-dir", str(ROOT / "configs"),
-                       "--output-dir", str(tmp_path), "--standard-python", sys.executable]) == 1
+                       "--output-dir", str(tmp_path), "--decision-python", sys.executable]) == 1
     result = json.loads((tmp_path / "summary.json").read_text())
     assert not result["ok"] and result["mode"] == "real_inference"
     assert not stale.exists()

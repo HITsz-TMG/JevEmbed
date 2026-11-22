@@ -62,6 +62,6 @@ Use isolated environments for the following extras. Do not install their incompa
 | `clm,jeva` | CLM-Qwen3.5-2B and Jeva-4B | Python 3.12, Torch 2.9.1, Transformers 5.17.0 |
 | `gemma-decision` | mrm8488 and qnaug EmbeddingGemma decision heads | Torch 2.10 or later, Transformers 5.19.0; BF16 or FP32 |
 | `kanana` | Kanana-2-v-decide-3b-2611 | Torch 2.10.0, Transformers 5.5.3 |
-| `local` with tested constraints | Nemotron and original embedding configurations | Torch 2.8.0, Transformers 4.51.0, Sentence Transformers 5.3.0 |
+| `local` with tested constraints | Original Sentence Transformers embedding configurations | Torch 2.8.0, Transformers 4.51.0, Sentence Transformers 5.3.0 |
 
-Kanana and mrm8488 use pinned remote modeling code; Nemotron preserves its repository-provided modules. Jeva and qnaug use local adapters or an installed pinned runtime. These integrations accept text/JSON; checkpoint image or multimedia support is not exposed by the JevEmbed schema. mrm8488's native API rejects custom Noul criteria. Native heads own their probability and cache behavior; see the model guides for restrictions and validation scope.
+Kanana and mrm8488 use pinned remote modeling code. Jeva and qnaug use local adapters or an installed pinned runtime. These integrations accept text/JSON; checkpoint image or multimedia support is not exposed by the JevEmbed schema. mrm8488's native API rejects custom Noul criteria. Native heads own their probability and cache behavior; see the model guides for restrictions and validation scope.

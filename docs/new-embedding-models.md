@@ -26,25 +26,9 @@ The upstream model reports 76.4% accuracy on its Typed Decisions test and qnaug 
 
 `Ajeet-001/embeddinggemma2-decision-router` (revision `9809b3bc520b57f29e1c2e2df74f794708796337`, updated 2026-11-09) contains custom routing code, multimodal checkpoints and several export formats. The public repository inventory does not establish a compatible state/candidate scoring contract, so it needs source-level review and a reference test before integration. `convaiinnovations/laya-typed-decisions` is a 421M ModernBERT specialist for four English synthetic workflows and uses the separate `laya` runtime. `Danny-Dasilva/embeddinggemma-2-multimodal-typed-decision` has a richer custom `gemma_decision` package and vision/media heads. `sulabhkatiyar/embedding-gemma-multimodal-jev-indic` is a 746M multilingual and multimodal research checkpoint under mixed research terms and uses its own `egjev` package. These require runtime or schema adapters beyond the existing text-only integration.
 
-The Nemotron configuration reuses JevEmbed's existing Sentence Transformers backend. It is a retrieval baseline, not a newly verified Jev-trained decision checkpoint. Its official Hugging Face metadata and revision were refreshed on 2026-11-21. Full checkpoint inference and A100 deployment have not been run.
+For a faster download machine, `python scripts/prepare_jev_models.py download --weights-dir <directory> --model <model-id>` downloads the selected checkpoint's inference files at the revision pinned in its YAML, without executing model code. Repeat `--model` to select checkpoints; omitting it selects CLM-Qwen3.5-2B, Jeva-4B, and both EmbeddingGemma decision models. The helper can create local YAML files under `configs/local/` after transfer. Jeva checkpoints that reference an external backbone still need Hub access or a populated cache. File checks do not replace real inference.
 
-| ID | Scope | Dimension | Limit | Remote code |
-| --- | --- | ---: | ---: | --- |
-| `nemotron-embed-1b-v2` | General multilingual retrieval; 1B baseline | 2048 | 8192 | true, pinned to model revision |
-
-Nemotron uses `query:` and `passage:` prefixes; its query also includes the Jev question so instructions are preserved. The generic backend disables Sentence Transformers' stored default prompts with `prompt=""`, preserving the YAML templates. Native repository pooling is retained. Scoring constants are JevEmbed defaults and remain uncalibrated.
-
-Install `.[local,server]` in a separate environment from `.[kanana,server]`. Use the supplied examples (each includes Choice, Score and Noul):
-
-```bash
-python -m jevembed --config configs/nemotron-embed-1b-v2.yaml --input examples/nemotron_decide.json --explain
-```
-
-For a faster download machine, `python scripts/prepare_jev_models.py download --weights-dir <directory> --model <model-id>` downloads native safetensors/tokenizer/config/code/license files at the configuration's pinned revision without loading their code, skipping ONNX and similar export copies. Repeat `--model` for the models to deploy; omitting it selects the five A100 deployment targets: CLM-Qwen3.5-2B, Jeva-4B, both EmbeddingGemma decision models, and Nemotron. Upload that directory to the A100, then run the helper's `local-configs` action with the same model selections and server directory to create `configs/local/*.local.yaml`. Local Jeva configurations retain Hub access when the native checkpoint references an external base encoder; other complete local layouts are offline. This checks file presence only; actual inference remains required.
-
-Remove `--explain` for actual model inference. An explain result verifies request compilation only. `scripts/smoke_a100_models.py` runs the five A100 targets sequentially and saves outputs and logs; it does not include Kanana. Local Jeva configurations allow Hub access when the native checkpoint refers to an external backbone. Successful startup or `/v1/models` is not evidence of successful inference, because loading is lazy.
-
-Nemotron is a general retrieval baseline rather than a newly Jev-trained model. Evaluate it on held-out Jev tasks before comparing accuracy or probabilities. It has NVIDIA and Llama license terms; preserve the downloaded LICENSE and model card when moving weights.
+Remove `--explain` for actual model inference. An explain result verifies request compilation only. `scripts/smoke_a100_models.py` runs the four deployment targets sequentially and saves outputs and logs; it does not include Kanana, which uses its own Transformers environment. Successful startup or `/v1/models` is not evidence of successful inference, because loading is lazy.
 
 ## Specialized decision candidates
 

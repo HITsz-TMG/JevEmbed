@@ -12,7 +12,6 @@ These examples are organized by task and shared by all supported models.
 | `clm_qwen35_decide.json` | State and ordered options rendered with CLM's chat template | Choice, Score, Noul |
 | `jeva_decide.json` | State-aware decisions from Jeva's native matrix head | Choice, Score, Noul |
 | `kanana_decide.json` | State and candidate vectors from Kanana 2 V Decide | Choice, Score, Noul |
-| `nemotron_decide.json` | General multilingual retrieval baseline | Choice, Score, Noul |
 
 The JSON files default to `model: kalm-embedding-v2.5`. To switch models, change only `model` and load the corresponding configuration. Keep state, instructions, and criteria unchanged.
 

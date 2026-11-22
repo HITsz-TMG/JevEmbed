@@ -18,6 +18,8 @@ Both use Torch 2.9.1, Transformers 5.17.0, PEFT 0.21.2, and Accelerate 1.12.0. J
 
 The public YAML uses the upstream 131,072-token limit, BF16, and truncation. That is an input bound, not a claim that long requests fit any GPU. Start with batch size 1 and a lower token limit in a copied local configuration on A100 40GB; record truncation and configuration changes when evaluating results.
 
+This configuration selects the released `clm_heads.pt`. The upstream card's 72.4% Typed Decisions result uses a separate `specialists/typed-decisions/clm_heads.pt` fitted on that benchmark's training split. Do not attribute that specialist result to the configured release heads or to JevEmbed's smoke test.
+
 ```bash
 python -m jevembed --config configs/clm-qwen3.5-2b.yaml \
   --input examples/clm_qwen35_decide.json --trace
