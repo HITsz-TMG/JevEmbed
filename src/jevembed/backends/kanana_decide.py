@@ -79,7 +79,7 @@ class KananaDecideBackend:
             from transformers import AutoModel
             from huggingface_hub import snapshot_download
         except ImportError as exc:
-            raise BackendError("Install jevembed[kanana] in a separate environment; see docs/kanana.md") from exc
+            raise BackendError("Install jevembed[kanana] in a separate environment; see docs/compatibility.md#decision-model-runtimes") from exc
         cfg = self.config
         device = ("cuda" if torch.cuda.is_available() else "cpu") if cfg.device == "auto" else cfg.device
         if device.startswith("cuda") and not torch.cuda.is_available():

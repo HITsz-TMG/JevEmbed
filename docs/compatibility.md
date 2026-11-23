@@ -64,4 +64,36 @@ Use isolated environments for the following extras. Do not install their incompa
 | `kanana` | Kanana-2-v-decide-3b-2611 | Torch 2.10.0, Transformers 5.5.3 |
 | `local` with tested constraints | Original Sentence Transformers embedding configurations | Torch 2.8.0, Transformers 4.51.0, Sentence Transformers 5.3.0 |
 
-Kanana and mrm8488 use pinned remote modeling code. Jeva and qnaug use local adapters or an installed pinned runtime. These integrations accept text/JSON; checkpoint image or multimedia support is not exposed by the JevEmbed schema. mrm8488's native API rejects custom Noul criteria. Native heads own their probability and cache behavior; see the model guides for restrictions and validation scope.
+Install the extras in their respective environments with `python -m pip install -e '.[clm,jeva,server]'`, `python -m pip install -e '.[gemma-decision,server]'`, or `python -m pip install -e '.[kanana,server]'`. Jeva's runtime is pinned to GitHub commit `e2104e0720100f979f2cdd456a1cbbee96da0abd`. The standard `local` extra uses a different Transformers version.
+
+| Configuration | Decision behavior |
+| --- | --- |
+| [CLM-Qwen3.5-2B](../configs/clm-qwen3.5-2b.yaml) | Reuses the paired-projection backend with the checkpoint's chat template, assistant answer position, two normalized 512-dimensional heads, and native logit scale. Downloads the base Qwen3.5-2B encoder and the released `clm_heads.pt` separately |
+| [Jeva-4B](../configs/jeva-4b.yaml) | Retains the LoRA adapter, state/option encoder, option memory, and set-aware decision head. Native probabilities map to Choice, expected Score, and the true probability for Noul; the upstream null candidate is disabled |
+| [Kanana-2-v-decide-3b-2611](../configs/kanana-2-v-decide-3b-2611.yaml) | Uses the pinned native renderer, separate state/candidate embeddings, last-token pooling, normalization, and checkpoint decision temperature. Weights use the upstream [KananaOpenLicense](https://huggingface.co/kakaocorp/kanana-2-v-decide-3b-2611/blob/main/LICENSE) |
+| [EmbeddingGemma Typed Decision](../configs/embeddinggemma-2-ft-typed-decision.yaml) | Calls the checkpoint's `decide` API, which separately pools state, question, and options and applies a schema-conditioned head. Custom Noul criteria are rejected |
+| [EmbeddingGemma2 Decision](../configs/qnaug-embeddinggemma2-decision.yaml) | Pools question and option spans from one sequence, then applies the local implementation of the released head and its typed temperatures. Loads `head.pt` with `weights_only=True` |
+
+Kanana and mrm8488 use remote modeling code pinned to the same revision as their weights. Jeva uses the pinned installed runtime; qnaug's head is implemented locally without remote code. These integrations accept text/JSON; checkpoint image or multimedia support is not exposed by the JevEmbed schema. Use BF16 or FP32 for the EmbeddingGemma models; FP16 is rejected because it can produce NaNs. Native heads own their probability and cache behavior, as described in [runtime behavior](runtime.md#native-decision-backends).
+
+The configurations pin the released checkpoints. In particular, CLM uses the release heads, rather than the separately published Typed Decisions specialist. Upstream benchmark scores do not establish accuracy on JevEmbed tasks. Unit tests and `--explain` verify adapter behavior and request compilation; full-checkpoint inference and accuracy evaluation are separate checks.
+
+### Use the shared task examples
+
+Choose a configuration from the table and set the request's model ID, as with the existing models:
+
+```python
+import json
+from pathlib import Path
+from jevembed import JevEmbed, ModelConfig
+
+config = ModelConfig.load("configs/qnaug-embeddinggemma2-decision.yaml")
+request = json.loads(Path("examples/official_choice_exchange.json").read_text(encoding="utf-8"))
+request["model"] = config.model_id
+client = JevEmbed(config=config)
+print(client.evaluate(request))
+```
+
+The same pattern works with `official_score_safari.json` and `official_noul_escalation.json`. For mrm8488, submit only `is_human_escalation` from the Noul example; `is_repeat_contact` has custom criteria that its native API does not support. Keep those criteria for models that support them.
+
+For CLI use, save the modified request under the existing ignored `artifacts/` directory, then run `python -m jevembed --config configs/qnaug-embeddinggemma2-decision.yaml --input artifacts/request.json`. Replace the configuration and request model ID together. Local weight paths belong in an ignored YAML copy; see [offline loading](runtime.md#local-weights-and-offline-use).

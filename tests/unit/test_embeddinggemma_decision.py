@@ -155,6 +155,11 @@ def test_gemma_loader_uses_same_pinned_snapshot_for_model_and_tokenizer(monkeypa
     fake_hub = types.ModuleType("huggingface_hub")
     fake_hub.__version__ = "1.31.0"
     fake_hub.snapshot_download = lambda **kwargs: (calls["snapshot"].append(kwargs) or str(tmp_path))
+    fake_torch = types.ModuleType("torch")
+    fake_torch.__version__ = "2.10.0"
+    fake_torch.float32 = "float32"
+    fake_torch.cuda = types.SimpleNamespace(is_available=lambda: False)
+    monkeypatch.setitem(sys.modules, "torch", fake_torch)
     monkeypatch.setitem(sys.modules, "transformers", fake_transformers)
     monkeypatch.setitem(sys.modules, "huggingface_hub", fake_hub)
 
@@ -186,14 +191,16 @@ def test_configs_pin_code_and_disable_remote_code_for_local_clef_adapter():
     assert len(clef.revision) == 40
 
 
-def test_qnaug_example_uses_its_dedicated_model_and_covers_typed_decisions():
+@pytest.mark.parametrize("example", ["official_choice_exchange", "official_score_safari",
+                                    "official_noul_escalation"])
+def test_qnaug_compiles_shared_task_examples(example):
     import json
 
-    request = json.loads((ROOT / "examples/qnaug_embeddinggemma_decide.json").read_text(encoding="utf-8"))
+    request = json.loads((ROOT / f"examples/{example}.json").read_text(encoding="utf-8"))
     config = ModelConfig.load(ROOT / "configs/qnaug-embeddinggemma2-decision.yaml")
-    assert request["model"] == config.model_id
+    request["model"] = config.model_id
     result = JevEmbed(config=config).explain(request)
     assert {task["path"] for task in result["tasks"]} == {
         "native_clef_gemma_decision",
     }
-    assert {task["question_id"] for task in result["tasks"]} == {"team", "urgent", "severity"}
+    assert {task["question_id"] for task in result["tasks"]} == set(request["questions"])

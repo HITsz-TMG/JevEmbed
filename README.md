@@ -24,6 +24,7 @@
 
 ## News
 
+- 23/11/2026: 🔌 Added support for [CLM-Qwen3.5-2B](configs/clm-qwen3.5-2b.yaml), [Jeva-4B](configs/jeva-4b.yaml), [Kanana-2-v-decide-3b-2611](configs/kanana-2-v-decide-3b-2611.yaml), [EmbeddingGemma Typed Decision](configs/embeddinggemma-2-ft-typed-decision.yaml), and [EmbeddingGemma2 Decision](configs/qnaug-embeddinggemma2-decision.yaml) for Choice, Score, and Noul decisions.
 - 29/9/2026: 📏 Added a versioned [benchmark module](docs/benchmark.md) with multi-file JSONL cases, unified Choice/Score/Noul evaluation, and structured JSON results.
 - 28/9/2026: ✨ Released [JevEmbed-Qwen3-Embedding-4B](https://huggingface.co/HIT-TMG/JevEmbed-Qwen3-Embedding-4B), fine-tuned on JevEmbed-Data, with merged weights and a LoRA adapter.
 - 27/9/2026: 🕹️ Added an interactive [Playground](docs/playground.md) with model comparison and Game Lab.
@@ -163,9 +164,7 @@ Supported models are listed below. Configurations use Hugging Face repository ID
 
 CLM-v0.1-8B uses [Qwen/Qwen3-8B](https://huggingface.co/Qwen/Qwen3-8B) as its base encoder with separate state and action projection heads.
 
-The decision integrations retain released heads and rendering: [CLM Qwen3.5 and Jeva](docs/clm-qwen35-and-jeva.md), [Kanana](docs/kanana.md), and [two EmbeddingGemma variants](docs/new-embedding-models.md). Their model extras need separate compatible environments; core installation and `--explain` still require no model libraries.
-
-The model configuration pages document runtimes and local inference. Adapter tests and offline compilation do not establish full-checkpoint GPU performance or accuracy.
+The decision integrations retain released heads and rendering. See [decision model runtimes](docs/compatibility.md#decision-model-runtimes) for dependencies, model behavior, and use with the shared examples. Their model extras need separate compatible environments; core installation and `--explain` still require no model libraries.
 
 See [model configuration and loading](docs/compatibility.md#model-configuration-and-loading) for aliases, truncation, remote-code trust, and model-specific behavior.
 
