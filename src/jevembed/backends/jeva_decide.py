@@ -1,40 +1,27 @@
 """Bridge JevEmbed requests to Jeva's released set-aware decision head."""
 
 import importlib.metadata
-import json
-import math
 import threading
+from dataclasses import replace
 
-from .base import EmbeddingInput
+from ..compiler import compile_request
 from ..errors import BackendError, ValidationError
-
-
-def _text(value):
-    return value if isinstance(value, str) else json.dumps(value, ensure_ascii=False, sort_keys=True, allow_nan=False)
+from ..scoring import decision_response
+from .runtime import resolve_device
 
 
 def compile_jeva_request(request, prompts):
-    from ..compiler import TaskPlan
-
-    plans = []
-    for qid, question in request["questions"].items():
-        kind, criteria = question["type"], question.get("criteria")
-        if kind == "choice":
-            labels = list(criteria)
-            texts = [label if criteria[label] in (None, "") else f"{label}: {_text(criteria[label])}" for label in labels]
-        elif kind == "score":
-            labels = [str(i) for i in range(len(criteria))]
-            texts = [_text(value) for value in criteria]
-        else:
-            labels = ["false", "true"]
-            texts = [label if criteria is None or criteria[label] == "" else _text(criteria[label]) for label in labels]
-        instruction = _text(question["instructions"])
+    plans = compile_request(request, prompts)
+    for plan, (question_id, question) in zip(plans, request["questions"].items(), strict=True):
+        plan.path = "native_jeva"
+        instruction = plan.inputs[0].instruction
+        if plan.kind == "noul" and "criteria" in question:
+            for index, (label, item) in enumerate(zip(plan.labels, plan.inputs[1:], strict=True), start=1):
+                if question["criteria"][label] is None:
+                    plan.inputs[index] = replace(item, text="null")
+        texts = [item.text for item in plan.inputs[1:]]
         if not instruction.strip() or any(not text.strip() for text in texts):
             raise ValidationError("Jeva requires nonempty instructions and candidate texts")
-        inputs = [EmbeddingInput("query", instruction, _text(request["state"]))]
-        inputs.extend(EmbeddingInput("document", "", value) for value in texts)
-        legend = dict(zip(labels, criteria)) if kind == "score" else {}
-        plans.append(TaskPlan(qid, kind, "native_jeva", inputs, labels, legend))
     return plans
 
 
@@ -59,7 +46,7 @@ class JevaDecisionBackend:
             import torch
             from jeva import Jeva
 
-            device = ("cuda" if torch.cuda.is_available() else "cpu") if cfg.device == "auto" else cfg.device
+            device = resolve_device(cfg, torch)
             options = dict(device=device, revision=cfg.revision, local_files_only=cfg.local_files_only,
                            trust_remote_code=False, cache="hybrid" if cfg.cache_capacity else "none",
                            option_cache_size=max(1, cfg.cache_capacity), option_chunk_size=cfg.batch_size,
@@ -88,7 +75,7 @@ class JevaDecisionBackend:
     def evaluate(self, request, plans):
         with self._lock:
             self.prepare()
-            answers, diagnostics, tokens = {}, {}, 0
+            predictions, truncations, tokens = {}, {}, 0
             for plan in plans:
                 try:
                     native = self._model.predict(
@@ -99,27 +86,12 @@ class JevaDecisionBackend:
                     raise ValidationError(str(exc)) from exc
                 except Exception as exc:
                     raise BackendError(f"Native Jeva decision failed: {exc}") from exc
-                probabilities = [float(value) for value in native.candidate_probabilities]
-                if (len(probabilities) != len(plan.labels) or
-                    not all(math.isfinite(value) and 0 <= value <= 1 for value in probabilities) or
-                    not math.isclose(sum(probabilities), 1.0, abs_tol=1e-5)):
-                    raise BackendError("Jeva returned invalid candidate probabilities")
-                distribution = dict(zip(plan.labels, probabilities))
-                if plan.kind == "noul":
-                    answer = {"type": "noul", "noul": distribution["true"]}
-                else:
-                    answer = {"type": plan.kind, "probabilities": distribution,
-                              "confidence": max(probabilities)}
-                    if plan.kind == "choice":
-                        answer["choice"] = plan.labels[max(range(len(probabilities)), key=probabilities.__getitem__)]
-                    else:
-                        answer.update(score=math.fsum(i * p for i, p in enumerate(probabilities)), legend=plan.legend)
                 if type(native.usage.input_tokens) is not int or native.usage.input_tokens < 0:
                     raise BackendError("Jeva returned invalid input token usage")
                 tokens += native.usage.input_tokens
-                answers[plan.question_id] = answer
-                diagnostics[plan.question_id] = {"path": "native_jeva", "probabilities": distribution,
-                                                 "truncated_tokens": native.usage.truncated_tokens}
-            response = {"model": self.config.model_id, "answers": answers,
-                        "usage": {"input_tokens": tokens, "output_tokens": 0}}
+                predictions[plan.question_id] = native.candidate_probabilities
+                truncations[plan.question_id] = native.usage.truncated_tokens
+            response, diagnostics = decision_response(self.config, plans, predictions, tokens, tolerance=1e-5)
+            for question_id, truncated_tokens in truncations.items():
+                diagnostics[question_id]["truncated_tokens"] = truncated_tokens
             return response, diagnostics

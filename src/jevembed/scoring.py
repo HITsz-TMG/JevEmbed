@@ -53,6 +53,59 @@ def top_margin(probabilities):
     return min(1.0, max(0.0, top - (math.fsum(probabilities) - top) / (len(probabilities) - 1)))
 
 
+def decision_answer(plan, probabilities, expected_score=None, *, tolerance=1e-3):
+    """Map a native head's candidate probabilities to the shared answer schema."""
+    if isinstance(probabilities, dict):
+        values = [float(probabilities.get(label, float("nan"))) for label in plan.labels]
+    else:
+        values = [float(value) for value in probabilities]
+    if (len(values) != len(plan.labels) or
+        not all(math.isfinite(value) and 0 <= value <= 1 for value in values) or
+        not math.isclose(math.fsum(values), 1.0, abs_tol=tolerance)):
+        raise BackendError("Decision head returned invalid probabilities")
+    total = math.fsum(values)
+    values = [value / total for value in values]
+    distribution = dict(zip(plan.labels, values, strict=True))
+    if plan.kind == "noul":
+        if "true" not in distribution:
+            raise BackendError("Noul decision output has no true probability")
+        answer = {"type": "noul", "noul": distribution["true"]}
+    else:
+        answer = {"type": plan.kind, "probabilities": distribution, "confidence": max(values)}
+        if plan.kind == "choice":
+            answer["choice"] = plan.labels[max(range(len(values)), key=values.__getitem__)]
+        else:
+            score = (math.fsum(i * probability for i, probability in enumerate(values))
+                     if expected_score is None else float(expected_score))
+            if not math.isfinite(score):
+                raise BackendError("Decision head returned a non-finite expected score")
+            answer.update(score=score, legend=plan.legend)
+    return answer, distribution
+
+
+def decision_response(config, plans, predictions, input_tokens, *, tolerance=1e-3):
+    """Return JevEmbed's standard response and diagnostics for native heads."""
+    if type(input_tokens) is not int or input_tokens < 0:
+        raise BackendError("Decision backend returned invalid input token usage")
+    answers, diagnostics = {}, {}
+    for plan in plans:
+        try:
+            prediction = predictions[plan.question_id]
+            probabilities = getattr(prediction, "probabilities", prediction)
+            expected_score = getattr(prediction, "expected_level", None)
+            answer, distribution = decision_answer(
+                plan, probabilities, expected_score, tolerance=tolerance)
+        except BackendError as exc:
+            raise BackendError(f"Invalid decision output for {plan.question_id}: {exc}") from exc
+        except (AttributeError, KeyError, TypeError, ValueError) as exc:
+            raise BackendError(f"Invalid decision output for {plan.question_id}: {exc}") from exc
+        answers[plan.question_id] = answer
+        diagnostics[plan.question_id] = {"path": plan.path, "probabilities": distribution}
+    response = {"model": config.model_id, "answers": answers,
+                "usage": {"input_tokens": input_tokens, "output_tokens": 0}}
+    return response, diagnostics
+
+
 def sigmoid(value):
     if value >= 0:
         return 1 / (1 + math.exp(-value))

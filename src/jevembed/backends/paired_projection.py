@@ -14,6 +14,7 @@ from ..config import LogisticConfig
 from ..errors import BackendError, ValidationError
 from ..prompts import PromptAdapter
 from .clm_qwen35 import render_query
+from .runtime import resolve_device_dtype
 
 
 def _make_head(nn, *, hidden, width, depth, projection, activation, layernorm, residual):
@@ -101,14 +102,7 @@ class PairedProjectionBackend:
         except ImportError as exc:
             raise BackendError("Install jevembed[local] for paired-projection inference") from exc
         cfg = self.config
-        device = ("cuda" if torch.cuda.is_available() else "cpu") if cfg.device == "auto" else cfg.device
-        if device.startswith("cuda") and not torch.cuda.is_available():
-            raise BackendError("CUDA was requested but is unavailable")
-        dtype = cfg.dtype
-        if dtype == "auto":
-            dtype = "bfloat16" if device.startswith("cuda") and torch.cuda.is_bf16_supported() else "float32"
-        if device == "cpu" and dtype != "float32":
-            raise ValidationError("CPU backend requires dtype=float32 or auto")
+        device, dtype, torch_dtype = resolve_device_dtype(cfg, torch)
         checkpoint_path = self._checkpoint_path()
         try:
             checkpoint = torch.load(checkpoint_path, map_location="cpu", weights_only=True)
@@ -138,7 +132,7 @@ class PairedProjectionBackend:
         except (KeyError, ValueError, TypeError, RuntimeError) as exc:
             raise BackendError(f"Invalid paired-projection checkpoint: {exc}") from exc
         model_kwargs = {"revision": cfg.revision, "trust_remote_code": cfg.trust_remote_code,
-                        "local_files_only": cfg.local_files_only, "torch_dtype": getattr(torch, dtype)}
+                        "local_files_only": cfg.local_files_only, "torch_dtype": torch_dtype}
         if cfg.code_revision:
             model_kwargs["code_revision"] = cfg.code_revision
         if cfg.attention_implementation:

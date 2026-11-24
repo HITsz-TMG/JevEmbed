@@ -10,7 +10,7 @@ import time
 from .backends import (ClefGemmaDecisionBackend, GemmaTypedDecisionBackend, HTTPEmbeddingBackend,
                        JevaDecisionBackend, KananaDecideBackend,
                        PairedProjectionBackend, SentenceTransformersBackend)
-from .backends.embeddinggemma_decision import compile_typed_decision_request
+from .backends.embeddinggemma_decision import compile_clef_request, compile_gemma_request
 from .backends.kanana_decide import compile_kanana_request
 from .backends.clm_qwen35 import compile_clm_request
 from .backends.jeva_decide import compile_jeva_request
@@ -92,8 +92,10 @@ class JevEmbed:
             plans = compile_kanana_request(request, entry.config.prompts)
         elif entry.config.backend == "jeva_decide":
             plans = compile_jeva_request(request, entry.config.prompts)
-        elif entry.config.backend in ("gemma_typed_decision", "clef_gemma_decision"):
-            plans = compile_typed_decision_request(request, entry.config.backend)
+        elif entry.config.backend == "gemma_typed_decision":
+            plans = compile_gemma_request(request, entry.config.prompts)
+        elif entry.config.backend == "clef_gemma_decision":
+            plans = compile_clef_request(request, entry.config.prompts)
         elif entry.config.prompts.version == "clm-qwen35-chat-options-v1":
             plans = compile_clm_request(request, entry.config.prompts)
         else:

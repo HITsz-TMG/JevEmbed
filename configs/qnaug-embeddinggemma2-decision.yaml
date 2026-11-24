@@ -14,6 +14,17 @@ overflow_policy: truncate
 attention_implementation: sdpa
 prompts:
   version: qnaug-clef-typed-decision-v1
+  serialization_mode: compact_json_ordered
+  choice_empty_uses_label: true
+  score_candidate_template: "{label}: {text}"
+  noul_input_mapping: binary_candidates
+  noul_candidate_order: request
+  noul_candidate_template: "{label}: {text}"
+  noul_empty_uses_label: true
+  noul_null_uses_text: true
+  noul_matching_label_uses_label: true
+  noul_true_fallback: "Yes."
+  noul_false_fallback: "No."
 scoring:
   choice_temperature: 1.0
   score_temperature: 1.0

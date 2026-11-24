@@ -7,7 +7,8 @@ from jevembed import JevEmbed, ModelConfig
 from jevembed.backends.embeddinggemma_decision import (
     ClefGemmaDecisionBackend,
     GemmaTypedDecisionBackend,
-    compile_typed_decision_request,
+    compile_gemma_request,
+    compile_clef_request,
 )
 from jevembed.errors import BackendError, ValidationError
 
@@ -45,6 +46,19 @@ class FakeGemmaDecisionModel:
             "urgent": SimpleNamespace(probabilities={"false": 0.25, "true": 0.75}),
             "severity": SimpleNamespace(probabilities={"0": 0.1, "1": 0.6, "2": 0.3}, expected_level=1.2),
         }
+
+
+def test_gemma_adapter_reuses_the_shared_request_compiler():
+    config = ModelConfig.load(ROOT / "configs/embeddinggemma-2-ft-typed-decision.yaml")
+    request = sample_request()
+    plans = compile_gemma_request(request, config.prompts)
+
+    assert [plan.path for plan in plans] == ["native_gemma_typed_decision"] * 3
+    assert plans[0].labels == ["billing", "technical"]
+    assert plans[1].labels == ["false", "true"]
+    assert plans[1].inputs[1].text == "no" and plans[1].inputs[2].text == "yes"
+    assert plans[2].inputs[1].text == "level 0 of 2: low"
+    assert plans[2].legend == {"0": "low", "1": "medium", "2": "high"}
 
 
 def test_gemma_native_decisions_map_to_jev_answers_and_keep_native_head():
@@ -123,7 +137,7 @@ def test_native_probability_schema_is_checked():
     config = ModelConfig.load(ROOT / "configs/embeddinggemma-2-ft-typed-decision.yaml")
     backend = GemmaTypedDecisionBackend(config=config, model=FakeGemmaDecisionModel())
     request = sample_request()
-    plans = compile_typed_decision_request(request, config.backend)
+    plans = compile_gemma_request(request, config.prompts)
     bad = FakeGemmaDecisionModel()
     bad.decide = lambda *args, **kwargs: {"team": SimpleNamespace(probabilities={"billing": float("nan"), "technical": 0.0})}
     backend._model = bad
@@ -179,7 +193,8 @@ def test_gemma_typed_decision_rejects_custom_noul_criteria():
     request = sample_request()
     request["questions"]["urgent"]["criteria"] = {"false": "No", "true": "Yes"}
     with pytest.raises(ValidationError, match="custom Noul"):
-        compile_typed_decision_request(request, "gemma_typed_decision")
+        config = ModelConfig.load(ROOT / "configs/embeddinggemma-2-ft-typed-decision.yaml")
+        compile_gemma_request(request, config.prompts)
 
 
 def test_configs_pin_code_and_disable_remote_code_for_local_clef_adapter():
@@ -204,3 +219,19 @@ def test_qnaug_compiles_shared_task_examples(example):
         "native_clef_gemma_decision",
     }
     assert {task["question_id"] for task in result["tasks"]} == set(request["questions"])
+
+
+def test_qnaug_candidate_texts_use_shared_compiler_configuration():
+    config = ModelConfig.load(ROOT / "configs/qnaug-embeddinggemma2-decision.yaml")
+    request = {"state": "state", "questions": {
+        "choice": {"type": "choice", "instructions": "pick", "criteria": {"a": None, "b": "bee"}},
+        "score": {"type": "score", "instructions": "rate", "criteria": ["low", "high"]},
+        "plain": {"type": "noul", "instructions": "yes?"},
+        "custom": {"type": "noul", "instructions": "yes?", "criteria": {"true": None, "false": "false"}},
+    }}
+    plans = compile_clef_request(request, config.prompts)
+    inputs = {plan.question_id: [item.text for item in plan.inputs] for plan in plans}
+    assert inputs["choice"] == ["state", "a", "b: bee"]
+    assert inputs["score"] == ["state", "0: low", "1: high"]
+    assert inputs["plain"] == ["state", "false: No.", "true: Yes."]
+    assert inputs["custom"] == ["state", "true: null", "false"]

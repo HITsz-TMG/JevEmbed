@@ -8,6 +8,7 @@ from conftest import ROOT
 from jevembed import JevEmbed, ModelConfig
 from jevembed.backends.clm_qwen35 import _chat_message, _option_lines, compile_clm_request, render_query
 from jevembed.backends.jeva_decide import JevaDecisionBackend
+from jevembed.backends.jeva_decide import compile_jeva_request
 
 
 class FakeTokenizer:
@@ -73,6 +74,22 @@ class FakeJeva:
 
     def clear_cache(self):
         self.cleared = True
+
+
+def test_jeva_compiler_reuses_shared_task_plans_and_keeps_native_candidate_order():
+    config = ModelConfig.load(ROOT / "configs/jeva-4b.yaml")
+    request = {"state": {"b": 2, "a": 1}, "questions": {
+        "choice": {"type": "choice", "instructions": "pick", "criteria": {"x": "", "y": None}},
+        "score": {"type": "score", "instructions": "rate", "criteria": ["low", "high"]},
+        "noul": {"type": "noul", "instructions": "binary?", "criteria": {"true": "", "false": None}},
+    }}
+
+    choice, score, noul = compile_jeva_request(request, config.prompts)
+    assert choice.inputs[0].text == '{"a":1,"b":2}'
+    assert [item.text for item in choice.inputs[1:]] == ["x", "y"]
+    assert [item.text for item in score.inputs[1:]] == ["low", "high"]
+    assert noul.labels == ["false", "true"]
+    assert [item.text for item in noul.inputs[1:]] == ["null", "true"]
 
 
 def test_jeva_native_head_maps_all_typed_answers_without_vector_scoring():

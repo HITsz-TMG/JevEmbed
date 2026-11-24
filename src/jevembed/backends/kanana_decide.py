@@ -11,6 +11,7 @@ from dataclasses import replace
 from .base import EmbeddingBatch, EmbeddingInput
 from ..config import ModelConfig
 from ..errors import BackendError, ValidationError
+from .runtime import resolve_device_dtype
 
 
 def _compact(value):
@@ -81,14 +82,7 @@ class KananaDecideBackend:
         except ImportError as exc:
             raise BackendError("Install jevembed[kanana] in a separate environment; see docs/compatibility.md#decision-model-runtimes") from exc
         cfg = self.config
-        device = ("cuda" if torch.cuda.is_available() else "cpu") if cfg.device == "auto" else cfg.device
-        if device.startswith("cuda") and not torch.cuda.is_available():
-            raise BackendError("CUDA was requested but is unavailable")
-        dtype = cfg.dtype
-        if dtype == "auto":
-            dtype = "bfloat16" if device.startswith("cuda") and torch.cuda.is_bf16_supported() else "float32"
-        if device == "cpu" and dtype != "float32":
-            raise ValidationError("CPU backend requires dtype=float32 or auto")
+        device, dtype, torch_dtype = resolve_device_dtype(cfg, torch)
         root = Path(cfg.model_name_or_path)
         try:
             if not root.is_dir():
@@ -97,7 +91,7 @@ class KananaDecideBackend:
                     allow_patterns=["*.json", "*.py", "*.jinja", "*.safetensors"]))
             root = root.resolve()
             kwargs = {"trust_remote_code": cfg.trust_remote_code, "local_files_only": True,
-                      "dtype": getattr(torch, dtype)}
+                      "dtype": torch_dtype}
             if cfg.attention_implementation:
                 kwargs["attn_implementation"] = cfg.attention_implementation
             model = AutoModel.from_pretrained(str(root), **kwargs).eval().to(device)

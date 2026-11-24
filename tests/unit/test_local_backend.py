@@ -6,6 +6,7 @@ import pytest
 
 from jevembed import JevEmbed, ModelConfig, BackendError, ValidationError
 from jevembed.backends import SentenceTransformersBackend, EmbeddingInput
+from jevembed.backends.runtime import resolve_device, resolve_device_dtype
 
 
 @pytest.fixture
@@ -48,6 +49,25 @@ def fake_runtime(monkeypatch):
     monkeypatch.setitem(sys.modules, "torch", torch)
     monkeypatch.setattr("jevembed.backends.sentence_transformers.importlib.metadata.version", lambda name: "test-version")
     return state
+
+
+def test_model_backends_share_device_and_dtype_selection():
+    torch = SimpleNamespace(float32="float32", bfloat16="bfloat16",
+                            cuda=SimpleNamespace(is_available=lambda: False,
+                                                 is_bf16_supported=lambda: False))
+    config = ModelConfig(device="auto", dtype="auto")
+    assert resolve_device(config, torch) == "cpu"
+    assert resolve_device_dtype(config, torch) == ("cpu", "float32", "float32")
+
+    torch.cuda.is_available = lambda: True
+    torch.cuda.is_bf16_supported = lambda: True
+    assert resolve_device_dtype(config, torch) == ("cuda", "bfloat16", "bfloat16")
+
+    with pytest.raises(ValidationError, match="float16"):
+        resolve_device_dtype(replace(config, dtype="float16"), torch, reject_float16=True)
+    with pytest.raises(BackendError, match="CUDA was requested"):
+        resolve_device(replace(config, device="cuda:1"),
+                       SimpleNamespace(cuda=SimpleNamespace(is_available=lambda: False)))
 
 
 def test_loader_parameters_prompt_once_usage_and_dimension(fake_runtime):

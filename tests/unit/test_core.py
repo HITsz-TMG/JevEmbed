@@ -11,6 +11,7 @@ from conftest import FixedBackend, ROOT, request
 from jevembed import JevEmbed, ModelConfig, PromptConfig, ScoringConfig, LogisticConfig, ValidationError, BackendError
 from jevembed.backends import EmbeddingBatch
 from jevembed.backends.sentence_transformers import SentenceTransformersBackend
+from jevembed.compiler import compile_request
 from jevembed.scoring import normalize_vectors, normalized_entropy, sigmoid, softmax
 from jevembed.serialization import serialize
 
@@ -139,6 +140,7 @@ def test_noul_input_mapping():
         "Instruct: Retrieve semantically similar text.\nQuery: instruction",
         "Instruct: Retrieve semantically similar text.\nQuery: state"]
     assert client.evaluate(without)["answers"]["q"]["noul"] == pytest.approx(sigmoid(8))
+    assert compile_request(without, config.prompts)[0].labels == []
 
     with_criteria = request("noul", {"false": "no", "true": "yes"})
     task = client.explain(with_criteria)["tasks"][0]
@@ -149,6 +151,12 @@ def test_noul_input_mapping():
         "Instruct: Retrieve semantically similar text.\nQuery: true: yes",
         "Instruct: Retrieve semantically similar text.\nQuery: false: no"]
     assert client.evaluate(with_criteria)["answers"]["q"]["noul"] == pytest.approx(sigmoid(8))
+
+
+def test_score_candidate_template_is_configurable():
+    prompts = replace(PromptConfig(), score_candidate_template="{label}: {text}")
+    plan = compile_request(request("score", ["low", "high"]), prompts)[0]
+    assert [item.text for item in plan.inputs[1:]] == ["0: low", "1: high"]
 
 
 @pytest.mark.parametrize("old_format", ["legacy", "unified", "unknown"])

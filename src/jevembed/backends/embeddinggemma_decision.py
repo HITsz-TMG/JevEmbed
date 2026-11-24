@@ -8,52 +8,27 @@ import math
 from pathlib import Path
 import threading
 
-from .base import EmbeddingInput
-from ..compiler import TaskPlan
+from ..compiler import compile_request
 from ..errors import BackendError, ValidationError
+from ..scoring import decision_response
+from .runtime import resolve_device_dtype
 
 
-def compile_typed_decision_request(request, backend):
-    plans = []
-    state = _to_text(request["state"])
-    for question_id, question in request["questions"].items():
-        kind = question["type"]
-        instruction = _to_text(question["instructions"])
-        criteria = question.get("criteria")
-        if kind == "choice":
-            labels = list(criteria)
-            descriptions = [label if value in (None, "") else _to_text(value)
-                            for label, value in criteria.items()]
-            candidates = [label if description == label else f"{label}: {description}"
-                          for label, description in zip(labels, descriptions, strict=True)]
-        elif kind == "score":
-            labels = [str(i) for i in range(len(criteria))]
-            descriptions = [_to_text(value) for value in criteria]
-            if backend == "gemma_typed_decision":
-                candidates = [f"level {label} of {len(labels) - 1}: {description}"
-                              for label, description in zip(labels, descriptions, strict=True)]
-            else:
-                candidates = [f"{label}: {description}" for label, description in zip(labels, descriptions, strict=True)]
-        else:
-            criteria = criteria or {}
-            if backend == "gemma_typed_decision" and any(
-                value not in (None, "") for value in criteria.values()
-            ):
-                raise ValidationError("EmbeddingGemma Typed Decision does not support custom Noul criteria")
-            if backend == "gemma_typed_decision":
-                labels = ["false", "true"]
-                candidates = ["no", "yes"]
-            else:
-                labels = list(criteria) if criteria else ["false", "true"]
-                descriptions = (["No.", "Yes."] if not criteria else
-                                [_to_text(criteria[label]) for label in labels])
-                candidates = [label if description in ("", label) else f"{label}: {description}"
-                              for label, description in zip(labels, descriptions, strict=True)]
-        inputs = [EmbeddingInput("query", instruction, state)]
-        inputs.extend(EmbeddingInput("document", "", candidate) for candidate in candidates)
-        legend = dict(zip(labels, criteria)) if kind == "score" else {}
-        path = "native_gemma_typed_decision" if backend == "gemma_typed_decision" else "native_clef_gemma_decision"
-        plans.append(TaskPlan(question_id, kind, path, inputs, labels, legend))
+def compile_gemma_request(request, prompts):
+    for question in request["questions"].values():
+        criteria = question.get("criteria") or {}
+        if question["type"] == "noul" and any(value not in (None, "") for value in criteria.values()):
+            raise ValidationError("EmbeddingGemma Typed Decision does not support custom Noul criteria")
+    plans = compile_request(request, prompts)
+    for plan in plans:
+        plan.path = "native_gemma_typed_decision"
+    return plans
+
+
+def compile_clef_request(request, prompts):
+    plans = compile_request(request, prompts)
+    for plan in plans:
+        plan.path = "native_clef_gemma_decision"
     return plans
 
 
@@ -61,70 +36,6 @@ def _to_text(value):
     if isinstance(value, str):
         return value
     return json.dumps(value, ensure_ascii=False, separators=(",", ":"), allow_nan=False)
-
-
-def _validate_probabilities(probabilities, labels):
-    if isinstance(probabilities, dict):
-        values = [float(probabilities.get(label, float("nan"))) for label in labels]
-    else:
-        values = [float(value) for value in probabilities]
-    if (len(values) != len(labels) or
-        not all(math.isfinite(value) and 0 <= value <= 1 for value in values) or
-        not math.isclose(math.fsum(values), 1.0, abs_tol=1e-3)):
-        raise BackendError("EmbeddingGemma decision head returned invalid probabilities")
-    total = math.fsum(values)
-    values = [value / total for value in values]
-    return dict(zip(labels, values, strict=True))
-
-
-def _answers_to_response(config, plans, predictions, input_tokens):
-    answers, diagnostics = {}, {}
-    for plan in plans:
-        try:
-            prediction = predictions[plan.question_id]
-            distribution = _validate_probabilities(prediction.probabilities, plan.labels)
-            if plan.kind == "noul":
-                if "true" not in distribution:
-                    raise BackendError("Noul output has no true probability")
-                answer = {"type": "noul", "noul": distribution["true"]}
-            else:
-                values = list(distribution.values())
-                answer = {"type": plan.kind, "probabilities": distribution,
-                          "confidence": max(values)}
-                if plan.kind == "choice":
-                    answer["choice"] = plan.labels[max(range(len(values)), key=values.__getitem__)]
-                else:
-                    expected = getattr(prediction, "expected_level", None)
-                    if expected is not None:
-                        expected = float(expected)
-                        if not math.isfinite(expected):
-                            raise BackendError("EmbeddingGemma returned a non-finite expected score")
-                    answer.update(score=(float(expected) if expected is not None else
-                                         math.fsum(i * probability for i, probability in enumerate(values))),
-                                  legend=plan.legend)
-            answers[plan.question_id] = answer
-            diagnostics[plan.question_id] = {"path": "native_embeddinggemma_decision",
-                                             "probabilities": distribution}
-        except (AttributeError, KeyError, TypeError, ValueError) as exc:
-            raise BackendError(f"Invalid EmbeddingGemma answer for {plan.question_id}: {exc}") from exc
-    if type(input_tokens) is not int or input_tokens < 0:
-        raise BackendError("EmbeddingGemma adapter returned invalid input token usage")
-    return ({"model": config.model_id, "answers": answers,
-             "usage": {"input_tokens": input_tokens, "output_tokens": 0}}, diagnostics)
-
-
-def _device_and_dtype(config, torch):
-    device = ("cuda" if torch.cuda.is_available() else "cpu") if config.device == "auto" else config.device
-    if device.startswith("cuda") and not torch.cuda.is_available():
-        raise BackendError("CUDA was requested but is unavailable")
-    dtype = config.dtype
-    if dtype == "auto":
-        dtype = "bfloat16" if device.startswith("cuda") and torch.cuda.is_bf16_supported() else "float32"
-    if dtype == "float16":
-        raise ValidationError("EmbeddingGemma 2 can return NaNs in float16; use bfloat16 or float32")
-    if device == "cpu" and dtype != "float32":
-        raise ValidationError("EmbeddingGemma CPU inference requires dtype=float32 or auto")
-    return device, getattr(torch, dtype)
 
 
 class GemmaTypedDecisionBackend:
@@ -153,7 +64,7 @@ class GemmaTypedDecisionBackend:
             import transformers
         except ImportError as exc:
             raise BackendError("Install jevembed[gemma-decision] in its dedicated Python environment") from exc
-        device, dtype = _device_and_dtype(cfg, torch)
+        device, dtype, torch_dtype = resolve_device_dtype(cfg, torch, reject_float16=True)
         try:
             root = Path(cfg.model_name_or_path)
             if not root.is_dir():
@@ -161,7 +72,7 @@ class GemmaTypedDecisionBackend:
                     repo_id=cfg.model_name_or_path, revision=cfg.revision,
                     local_files_only=cfg.local_files_only))
             model = AutoModel.from_pretrained(
-                str(root), trust_remote_code=True, local_files_only=True, dtype=dtype,
+                str(root), trust_remote_code=True, local_files_only=True, dtype=torch_dtype,
                 attn_implementation=cfg.attention_implementation or "sdpa",
             ).eval().to(device)
             if not callable(getattr(model, "decide", None)) or not callable(getattr(model, "_build_inputs", None)):
@@ -210,7 +121,7 @@ class GemmaTypedDecisionBackend:
                 raise
             except Exception as exc:
                 raise BackendError(f"EmbeddingGemma Typed Decision inference failed: {exc}") from exc
-            return _answers_to_response(self.config, plans, predictions, input_tokens)
+            return decision_response(self.config, plans, predictions, input_tokens)
 
 
 @dataclass(frozen=True)
@@ -246,7 +157,7 @@ class ClefGemmaDecisionBackend:
             from transformers import AutoModel, AutoTokenizer
         except ImportError as exc:
             raise BackendError("Install jevembed[gemma-decision] in its dedicated Python environment") from exc
-        device, dtype = _device_and_dtype(cfg, torch)
+        device, dtype, torch_dtype = resolve_device_dtype(cfg, torch, reject_float16=True)
         root = Path(cfg.model_name_or_path)
         if not root.is_dir():
             try:
@@ -262,7 +173,7 @@ class ClefGemmaDecisionBackend:
             checkpoint = torch.load(root / "head.pt", map_location="cpu", weights_only=True)
             if cfg.expected_dimension and int(checkpoint["d_model"]) != cfg.expected_dimension:
                 raise BackendError("Decision head dimension does not match expected_dimension")
-            encoder = AutoModel.from_pretrained(str(encoder_root), local_files_only=True, dtype=dtype,
+            encoder = AutoModel.from_pretrained(str(encoder_root), local_files_only=True, dtype=torch_dtype,
                                                 attn_implementation=cfg.attention_implementation or "sdpa").eval().to(device)
             tokenizer = AutoTokenizer.from_pretrained(str(encoder_root), local_files_only=True)
             hidden = int(checkpoint["d_model"])
@@ -380,14 +291,14 @@ class ClefGemmaDecisionBackend:
                 if not math.isfinite(temperature) or temperature <= 0:
                     raise BackendError("Clef checkpoint contains an invalid calibration temperature")
                 probabilities = torch.softmax(logits.float() / temperature, dim=-1).cpu().tolist()
-                distribution = _validate_probabilities(probabilities, plan.labels)
                 expected = (math.fsum(i * probability for i, probability in enumerate(probabilities))
                             if plan.kind == "score" else None)
-                predictions[plan.question_id] = _ClefAnswer(distribution, expected)
-            result, diagnostics = _answers_to_response(self.config, plans, predictions, len(ids))
+                predictions[plan.question_id] = _ClefAnswer(probabilities, expected)
+            result, diagnostics = decision_response(self.config, plans, predictions, len(ids))
             if truncation:
                 diagnostics[plans[0].question_id]["truncated_state"] = truncation
             return result, diagnostics
 
 
-__all__ = ["compile_typed_decision_request", "GemmaTypedDecisionBackend", "ClefGemmaDecisionBackend"]
+__all__ = ["compile_gemma_request", "compile_clef_request",
+           "GemmaTypedDecisionBackend", "ClefGemmaDecisionBackend"]

@@ -16,8 +16,13 @@ class PromptConfig:
     serialization_mode: str = "compact_json"
     choice_candidate_template: str = "{label}: {text}"
     choice_empty_uses_label: bool = False
+    score_candidate_template: str = "{text}"
     noul_input_mapping: str = "retrieval_queries"
+    noul_candidate_order: str = "true_false"
     noul_candidate_template: str = "{label}: {text}"
+    noul_empty_uses_label: bool = False
+    noul_null_uses_text: bool = False
+    noul_matching_label_uses_label: bool = False
     noul_true_fallback: str | None = None
     noul_false_fallback: str | None = None
     strip_rendered: bool = False
@@ -30,20 +35,24 @@ class PromptConfig:
             raise ValidationError("serialization_mode must be compact_json, compact_json_ordered or prose")
         if self.noul_input_mapping not in ("retrieval_queries", "binary_candidates"):
             raise ValidationError("noul_input_mapping must be retrieval_queries or binary_candidates")
-        for name in ("strip_rendered", "choice_empty_uses_label"):
+        if self.noul_candidate_order not in ("true_false", "false_true", "request"):
+            raise ValidationError("noul_candidate_order must be true_false, false_true or request")
+        for name in ("strip_rendered", "choice_empty_uses_label", "noul_empty_uses_label",
+                     "noul_null_uses_text", "noul_matching_label_uses_label"):
             if type(getattr(self, name)) is not bool:
                 raise ValidationError(f"{name} must be an explicit boolean")
         for template, allowed, required in (
             (self.query_template, {"instruction", "text"}, {"text"}),
             (self.document_template, {"instruction", "text"}, {"text"}),
             (self.choice_candidate_template, {"label", "text"}, set()),
+            (self.score_candidate_template, {"label", "max_label", "text"}, {"text"}),
             (self.noul_candidate_template, {"label", "text"}, set()),
         ):
             try:
                 fields = {f for _, f, _, _ in Formatter().parse(template) if f is not None}
                 if fields - allowed or not required <= fields:
                     raise ValueError(f"template requires {sorted(required)} and supports only {sorted(allowed)}")
-                template.format(instruction="", text="", label="")
+                template.format(instruction="", text="", label="", max_label="")
             except (ValueError, KeyError, TypeError) as exc:
                 raise ValidationError(f"Invalid prompt template: {exc}") from exc
         for fallback in (self.noul_true_fallback, self.noul_false_fallback):

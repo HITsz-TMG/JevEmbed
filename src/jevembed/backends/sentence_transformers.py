@@ -8,6 +8,7 @@ from .base import EmbeddingBatch
 from ..config import ModelConfig
 from ..errors import BackendError, ValidationError
 from ..prompts import PromptAdapter
+from .runtime import resolve_device_dtype
 
 
 class SentenceTransformersBackend:
@@ -36,13 +37,8 @@ class SentenceTransformersBackend:
             from sentence_transformers import SentenceTransformer
         except ImportError as exc:
             raise BackendError("Install jevembed[local] in a compatible environment") from exc
-        device = ("cuda" if torch.cuda.is_available() else "cpu") if cfg.device == "auto" else cfg.device
-        dtype = cfg.dtype
-        if dtype == "auto":
-            dtype = "bfloat16" if device.startswith("cuda") and torch.cuda.is_bf16_supported() else "float32"
-        if device == "cpu" and dtype != "float32":
-            raise ValidationError("CPU backend requires dtype=float32 or auto")
-        model_kwargs = {"torch_dtype": getattr(torch, dtype)}
+        device, dtype, torch_dtype = resolve_device_dtype(cfg, torch)
+        model_kwargs = {"torch_dtype": torch_dtype}
         if cfg.attention_implementation:
             model_kwargs["attn_implementation"] = cfg.attention_implementation
         if cfg.code_revision:

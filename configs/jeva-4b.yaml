@@ -13,6 +13,13 @@ max_input_tokens: 16384
 overflow_policy: error
 prompts:
   version: jeva-native-v1
+  choice_candidate_template: "{text}"
+  choice_empty_uses_label: true
+  noul_input_mapping: binary_candidates
+  noul_candidate_order: false_true
+  noul_candidate_template: "{text}"
+  noul_true_fallback: "true"
+  noul_false_fallback: "false"
 scoring:
   choice_temperature: 1.0
   score_temperature: 1.0

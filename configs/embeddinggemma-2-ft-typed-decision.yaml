@@ -15,6 +15,12 @@ overflow_policy: error
 attention_implementation: sdpa
 prompts:
   version: embeddinggemma-2-typed-decision-native-v1
+  score_candidate_template: "level {label} of {max_label}: {text}"
+  noul_input_mapping: binary_candidates
+  noul_candidate_order: false_true
+  noul_candidate_template: "{text}"
+  noul_true_fallback: "yes"
+  noul_false_fallback: "no"
 scoring:
   choice_temperature: 1.0
   score_temperature: 1.0
