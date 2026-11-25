@@ -1,0 +1,36 @@
+# CLM-Qwen3.5 uses the upstream chat-options state layout and paired projection heads.
+model_id: clm-qwen3.5-2b
+backend: paired_projection
+model_name_or_path: Qwen/Qwen3.5-2B
+revision: 15852e8c16360a2fea060d615a32b45270f8a8fc
+projection_name_or_path: jayavibhav/clm-qwen3.5-2b
+projection_filename: clm_heads.pt
+projection_revision: 9c00217f5e506a4ba2e2777560c8c26f2149cff0
+aliases: [jayavibhav/clm-qwen3.5-2b]
+trust_remote_code: false
+local_files_only: false
+device: cuda
+dtype: bfloat16
+batch_size: 8
+pooling: last_token
+normalize_embeddings: true
+expected_dimension: 512
+max_input_tokens: 131072
+overflow_policy: truncate
+attention_implementation: sdpa
+prompts:
+  query_template: "{text}"
+  document_template: "{text}"
+  serialization_mode: compact_json_ordered
+  choice_candidate_template: "{text}"
+  choice_empty_uses_label: true
+  noul_candidate_template: "{text}"
+  strip_rendered: true
+  version: clm-qwen35-chat-options-v1
+scoring:
+  choice_temperature: 0.03403791824092038
+  score_temperature: 0.03403791824092038
+  noul_with_criteria: {slope: 29.379, intercept: 0.0}
+  noul_without_criteria: {slope: 29.379, intercept: 0.0}
+  confidence: top_margin
+  calibration_status: upstream_checkpoint

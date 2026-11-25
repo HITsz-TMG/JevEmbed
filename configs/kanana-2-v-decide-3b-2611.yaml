@@ -1,0 +1,34 @@
+model_id: kanana-2-v-decide-3b-2611
+backend: kanana_decide
+model_name_or_path: kakaocorp/kanana-2-v-decide-3b-2611
+revision: 12820d654ed9789a0f7f48daeee1703c3483c464
+aliases: [kakaocorp/kanana-2-v-decide-3b-2611]
+trust_remote_code: true
+local_files_only: false
+device: auto
+dtype: auto
+batch_size: 8
+expected_dimension: 2560
+max_input_tokens: 20480
+overflow_policy: truncate
+attention_implementation: sdpa
+# The backend uses the checkpoint's native chat renderer. Query text in explain
+# is the state/question JSON payload; these templates display that payload.
+prompts:
+  query_template: "{text}"
+  document_template: "{text}"
+  serialization_mode: compact_json_ordered
+  choice_candidate_template: "{label}: {text}"
+  choice_empty_uses_label: true
+  noul_input_mapping: binary_candidates
+  noul_candidate_template: "{label}: {text}"
+  noul_true_fallback: "Yes. This is true: {instruction}"
+  noul_false_fallback: "No. This is false: {instruction}"
+  version: kanana-v-decide-2611
+scoring:
+  choice_temperature: 0.056139365295102696
+  score_temperature: 0.056139365295102696
+  noul_with_criteria: {slope: 17.812812716057458, intercept: 0.0}
+  noul_without_criteria: {slope: 17.812812716057458, intercept: 0.0}
+  confidence: top_margin
+  calibration_status: upstream_checkpoint

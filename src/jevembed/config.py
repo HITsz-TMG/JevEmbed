@@ -16,8 +16,13 @@ class PromptConfig:
     serialization_mode: str = "compact_json"
     choice_candidate_template: str = "{label}: {text}"
     choice_empty_uses_label: bool = False
+    score_candidate_template: str = "{text}"
     noul_input_mapping: str = "retrieval_queries"
+    noul_candidate_order: str = "true_false"
     noul_candidate_template: str = "{label}: {text}"
+    noul_empty_uses_label: bool = False
+    noul_null_uses_text: bool = False
+    noul_matching_label_uses_label: bool = False
     noul_true_fallback: str | None = None
     noul_false_fallback: str | None = None
     strip_rendered: bool = False
@@ -26,24 +31,28 @@ class PromptConfig:
     def __post_init__(self):
         if any(not isinstance(value, str) for value in (self.query_template, self.document_template, self.similarity_instruction, self.version)):
             raise ValidationError("Prompt settings must be strings")
-        if self.serialization_mode not in ("compact_json", "prose"):
-            raise ValidationError("serialization_mode must be compact_json or prose")
+        if self.serialization_mode not in ("compact_json", "compact_json_ordered", "prose"):
+            raise ValidationError("serialization_mode must be compact_json, compact_json_ordered or prose")
         if self.noul_input_mapping not in ("retrieval_queries", "binary_candidates"):
             raise ValidationError("noul_input_mapping must be retrieval_queries or binary_candidates")
-        for name in ("strip_rendered", "choice_empty_uses_label"):
+        if self.noul_candidate_order not in ("true_false", "false_true", "request"):
+            raise ValidationError("noul_candidate_order must be true_false, false_true or request")
+        for name in ("strip_rendered", "choice_empty_uses_label", "noul_empty_uses_label",
+                     "noul_null_uses_text", "noul_matching_label_uses_label"):
             if type(getattr(self, name)) is not bool:
                 raise ValidationError(f"{name} must be an explicit boolean")
         for template, allowed, required in (
             (self.query_template, {"instruction", "text"}, {"text"}),
             (self.document_template, {"instruction", "text"}, {"text"}),
             (self.choice_candidate_template, {"label", "text"}, set()),
+            (self.score_candidate_template, {"label", "max_label", "text"}, {"text"}),
             (self.noul_candidate_template, {"label", "text"}, set()),
         ):
             try:
                 fields = {f for _, f, _, _ in Formatter().parse(template) if f is not None}
                 if fields - allowed or not required <= fields:
                     raise ValueError(f"template requires {sorted(required)} and supports only {sorted(allowed)}")
-                template.format(instruction="", text="", label="")
+                template.format(instruction="", text="", label="", max_label="")
             except (ValueError, KeyError, TypeError) as exc:
                 raise ValidationError(f"Invalid prompt template: {exc}") from exc
         for fallback in (self.noul_true_fallback, self.noul_false_fallback):
@@ -144,6 +153,14 @@ class ModelConfig:
                 raise ValidationError("paired_projection requires an explicit pooling mode")
         elif any((self.projection_name_or_path, self.projection_filename, self.projection_revision)):
             raise ValidationError("Projection checkpoint settings require the paired_projection backend")
+        if self.backend == "jeva_decide" and not self.model_name_or_path:
+            raise ValidationError("jeva_decide requires model_name_or_path")
+        if self.backend in ("gemma_typed_decision", "clef_gemma_decision") and not self.model_name_or_path:
+            raise ValidationError(f"{self.backend} requires model_name_or_path")
+        if self.backend == "gemma_typed_decision" and (not self.trust_remote_code or not self.code_revision):
+            raise ValidationError("gemma_typed_decision requires trust_remote_code and a pinned code_revision")
+        if self.backend == "clef_gemma_decision" and self.trust_remote_code:
+            raise ValidationError("clef_gemma_decision uses the local JevEmbed adapter; remote code must be disabled")
         for name in ("trust_remote_code", "local_files_only", "normalize_embeddings", "server_enforces_length"):
             if type(getattr(self, name)) is not bool:
                 raise ValidationError(f"{name} must be an explicit boolean")
@@ -153,7 +170,8 @@ class ModelConfig:
         if self.max_input_tokens != "model_default" and (type(self.max_input_tokens) is not int or self.max_input_tokens < 1):
             raise ValidationError("max_input_tokens must be model_default or a positive integer")
         for name, choices in {"overflow_policy": ("error", "truncate"), "usage_mode": ("strict", "estimate"),
-                              "backend": ("sentence_transformers", "http", "paired_projection", "custom"),
+                              "backend": ("sentence_transformers", "http", "paired_projection", "kanana_decide",
+                                         "jeva_decide", "gemma_typed_decision", "clef_gemma_decision", "custom"),
                               "dtype": ("auto", "float32", "float16", "bfloat16"),
                               "pooling": ("model_default", "last_token", "mean", "cls"),
                               "query_truncation_side": ("left", "right"),
@@ -163,7 +181,7 @@ class ModelConfig:
                 raise ValidationError(f"Invalid {name}: {getattr(self, name)!r}")
         if self.backend != "paired_projection" and self.pooling != "model_default":
             raise ValidationError("Explicit pooling currently requires the paired_projection backend")
-        if self.backend in ("sentence_transformers", "http") and (
+        if self.backend in ("sentence_transformers", "http", "kanana_decide") and (
             self.query_truncation_side == "left" or self.document_truncation_side == "left"
         ):
             raise ValidationError("Left truncation requires the paired_projection or custom backend")

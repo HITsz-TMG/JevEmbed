@@ -1,0 +1,30 @@
+model_id: embeddinggemma-2-ft-typed-decision
+backend: gemma_typed_decision
+model_name_or_path: mrm8488/embeddinggemma-2-ft-typed-decision
+revision: 3d0069b4c56d7a7f505feb53bee90694b2c07845
+code_revision: 3d0069b4c56d7a7f505feb53bee90694b2c07845
+aliases: [mrm8488/embeddinggemma-2-ft-typed-decision]
+trust_remote_code: true
+local_files_only: false
+device: auto
+dtype: auto
+batch_size: 1
+expected_dimension: 768
+max_input_tokens: 8192
+overflow_policy: error
+attention_implementation: sdpa
+prompts:
+  version: embeddinggemma-2-typed-decision-native-v1
+  score_candidate_template: "level {label} of {max_label}: {text}"
+  noul_input_mapping: binary_candidates
+  noul_candidate_order: false_true
+  noul_candidate_template: "{text}"
+  noul_true_fallback: "yes"
+  noul_false_fallback: "no"
+scoring:
+  choice_temperature: 1.0
+  score_temperature: 1.0
+  noul_with_criteria: {slope: 1.0, intercept: 0.0}
+  noul_without_criteria: {slope: 1.0, intercept: 0.0}
+  confidence: top_margin
+  calibration_status: upstream_checkpoint

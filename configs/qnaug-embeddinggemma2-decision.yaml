@@ -1,0 +1,34 @@
+model_id: qnaug-embeddinggemma2-decision
+backend: clef_gemma_decision
+model_name_or_path: qnaug/embeddinggemma2-decision
+revision: 8cd99aef0e71b392fff66efa1d4d870f15ee0c78
+aliases: [qnaug/embeddinggemma2-decision]
+trust_remote_code: false
+local_files_only: false
+device: auto
+dtype: auto
+batch_size: 1
+expected_dimension: 768
+max_input_tokens: 1024
+overflow_policy: truncate
+attention_implementation: sdpa
+prompts:
+  version: qnaug-clef-typed-decision-v1
+  serialization_mode: compact_json_ordered
+  choice_empty_uses_label: true
+  score_candidate_template: "{label}: {text}"
+  noul_input_mapping: binary_candidates
+  noul_candidate_order: request
+  noul_candidate_template: "{label}: {text}"
+  noul_empty_uses_label: true
+  noul_null_uses_text: true
+  noul_matching_label_uses_label: true
+  noul_true_fallback: "Yes."
+  noul_false_fallback: "No."
+scoring:
+  choice_temperature: 1.0
+  score_temperature: 1.0
+  noul_with_criteria: {slope: 1.0, intercept: 0.0}
+  noul_without_criteria: {slope: 1.0, intercept: 0.0}
+  confidence: top_margin
+  calibration_status: upstream_checkpoint

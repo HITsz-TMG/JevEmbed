@@ -52,3 +52,18 @@ CLM-v0.1-8B uses separate state/action projections and [model-specific prompts](
 The tested stack uses PyTorch 2.8.0, Transformers 4.51.0, sentence-transformers 5.3.0, NumPy 1.26.4, and PyYAML 6.0.3. Transformers 4.51.0 is pinned for KaLM-embedding-multilingual-mini-instruct-v2.5 compatibility. Choose a PyTorch wheel for your hardware; CPU inference needs no FlashAttention.
 
 Optional [LoRA training](training.md) supports the Sentence Transformers models on one or more GPUs; CLM's paired-projection backend is inference-only. Automatic prompt optimization and scalar calibration fitting are not implemented. The [JevEmbed-Data test results](../reports/JEVEMBED_DATA_TEST.md) compare the six base models and three fine-tuned models. Separate [KaLM](../reports/OPEN_JEV_KALM_LORA.md) and [Qwen3 0.6B](../reports/OPEN_JEV_QWEN3_0.6B_LORA.md) reports compare base and LoRA models on Open-Jev validation.
+
+## Decision model runtimes
+
+The new decision models have incompatible Transformers requirements. Install each group in a separate environment; do not combine these extras.
+
+| Extra | Models | Runtime |
+| --- | --- | --- |
+| `clm,jeva` | CLM-Qwen3.5-2B and Jeva-4B | Python 3.12, Torch 2.9.1, Transformers 5.17.0 |
+| `gemma-decision` | mrm8488 and qnaug EmbeddingGemma decision heads | Torch 2.10 or later, Transformers 5.19.0; BF16 or FP32 |
+| `kanana` | Kanana-2-v-decide-3b-2611 | Torch 2.10.0, Transformers 5.5.3 |
+| `local` with tested constraints | Existing Sentence Transformers embedding configurations | Torch 2.8.0, Transformers 4.51.0, Sentence Transformers 5.3.0 |
+
+Install each group with `python -m pip install -e '.[clm,jeva,server]'`, `python -m pip install -e '.[gemma-decision,server]'`, or `python -m pip install -e '.[kanana,server]'`. Jeva is pinned to commit `e2104e0720100f979f2cdd456a1cbbee96da0abd`. The existing `local` extra uses a different Transformers version.
+
+Use BF16 or FP32 for EmbeddingGemma; FP16 can produce NaNs. The mrm8488 model does not support custom Noul criteria. Model configurations pin their checkpoints and document the selected backend. `--explain` checks request compilation but does not verify model loading or full-checkpoint inference.
