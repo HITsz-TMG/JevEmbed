@@ -62,9 +62,3 @@ app = create_app(client, limits=HTTPServiceLimits(max_body_bytes=4 * 1024 * 1024
 ```
 
 Each worker process has its own limit and in-memory cache; multiply the concurrency limit by the number of workers when estimating total model load.
-
-## Native decision backends
-
-Kanana retains the framework embedding cache and native query/candidate formatting. Jeva and the EmbeddingGemma decision backends own decision execution and token accounting; `clear_cache()` also forwards to a backend cache when implemented. Their traces identify the native renderer and head instead of reporting cosine scoring. qnaug packs all submitted questions and candidates in one sequence, so its vectors can depend on the other spans in the request. Jeva's head depends on the candidate set.
-
-Use [separate compatible environments](compatibility.md#decision-model-runtimes) for model groups with incompatible Transformers requirements. `--explain` and `/v1/models` do not load model weights; run an inference request to verify loading and execution. For offline Jeva inference, cache the base encoder referenced by the checkpoint as well as its head, tokenizer, and LoRA adapter. A local adapter directory alone does not contain the base encoder.
